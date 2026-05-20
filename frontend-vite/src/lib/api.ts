@@ -70,8 +70,26 @@ export async function healthCheck(): Promise<any | null> {
 
 export function isInAppBrowser(): boolean {
   const ua = navigator.userAgent;
-  // LinkedIn, Facebook, Instagram, Twitter/X in-app browsers all block Google OAuth (error 403 disallowed_useragent)
-  return /LinkedIn|FBAN|FBAV|FBIOS|Instagram|Twitter\/|Snapchat|MicroMessenger|Line\//.test(ua);
+  const w = window as any;
+
+  // Named app patterns (works when present)
+  if (/LinkedIn|FBAN|FBAV|FBIOS|Instagram|Twitter\/|Snapchat|MicroMessenger|Line\//.test(ua)) return true;
+
+  // Android WebView marker: Chrome UA includes "; wv)" when running inside a WebView
+  if (/Android/.test(ua) && /; wv\)/.test(ua)) return true;
+
+  // iOS: real Safari exposes window.safari.pushNotification; every in-app WKWebView omits it.
+  // Exclude known real iOS browsers (Chrome, Firefox, Edge, Opera) which also lack window.safari.
+  if (/iPhone|iPad|iPod/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)) {
+    try {
+      w.safari.pushNotification.toString();
+      return false; // threw or succeeded — it's real Safari either way
+    } catch {
+      return true; // property missing entirely: in-app WebView
+    }
+  }
+
+  return false;
 }
 
 export function googleLogin(): void {
