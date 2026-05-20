@@ -75,21 +75,7 @@ export function isInAppBrowser(): boolean {
 }
 
 export function googleLogin(): void {
-  const url = `${API_BASE}/api/v1/auth/google`;
-
-  if (!isInAppBrowser()) {
-    window.location.href = url;
-    return;
-  }
-
-  if (/Android/.test(navigator.userAgent)) {
-    // Android: intent:// URL forces the OS to open the URL in Chrome instead of the in-app WebView.
-    // Strips the https:// prefix because the intent scheme carries it separately.
-    window.location.href = `intent://${url.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;end`;
-  } else {
-    // iOS: window.open with _blank causes LinkedIn to hand off to Safari in most cases.
-    window.open(url, "_blank");
-  }
+  window.location.href = `${API_BASE}/api/v1/auth/google`;
 }
 
 export async function getMe(): Promise<any> {

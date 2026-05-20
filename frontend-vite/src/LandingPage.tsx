@@ -18,7 +18,7 @@ import {
   Lightbulb,
   Target,
 } from "lucide-react";
-import { getMe, googleLogin } from "./lib/api";
+import { getMe, googleLogin, isInAppBrowser } from "./lib/api";
 import { StrawieLogoSvg } from "./components/Logo";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 
@@ -1272,9 +1272,54 @@ const Footer: React.FC = () => {
   );
 };
 
+// ── Open-in-browser modal ───────────────────────────────────────────────
+const OpenInBrowserModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [copied, setCopied] = useState(false);
+  const isIos = /iPhone|iPad|iPod/.test(navigator.userAgent);
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 flex flex-col gap-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-semibold text-apple-ink text-[15px]">Open in your browser to sign in</p>
+            <p className="text-[13px] text-apple-ink-3 mt-1 leading-snug">
+              Google doesn't allow sign-in inside the LinkedIn app.{" "}
+              {isIos
+                ? "Tap the ··· menu at the top right and choose “Open in Safari”."
+                : "Tap the ··· menu and choose “Open in browser”."}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-apple-ink-3 hover:text-apple-ink text-xl leading-none mt-0.5">×</button>
+        </div>
+        <button
+          onClick={copyLink}
+          className="w-full py-2.5 rounded-xl bg-apple-ink text-white text-[14px] font-semibold active:scale-[0.98] transition"
+        >
+          {copied ? "Copied!" : "Copy link"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ── Page ───────────────────────────────────────────────────────────────
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
+  const [showBrowserModal, setShowBrowserModal] = useState(false);
 
   useEffect(() => {
     // Cookie auth: probe /me to learn if we're logged in. 401 = not logged in,
@@ -1283,6 +1328,10 @@ export const LandingPage: React.FC = () => {
       .then(() => navigate("/app", { replace: true }))
       .catch(() => {});
   }, [navigate]);
+
+  const handleSignIn = isInAppBrowser()
+    ? () => setShowBrowserModal(true)
+    : googleLogin;
 
   // Force light surface for the page; rest of the app is dark.
   return (
@@ -1295,13 +1344,14 @@ export const LandingPage: React.FC = () => {
           "radial-gradient(1200px 800px at 50% -200px, #FFFFFF 0%, #FAFAF7 60%, #FAFAF7 100%)",
       }}
     >
-      <Nav onSignIn={googleLogin} />
-      <Hero onCta={googleLogin} />
+      {showBrowserModal && <OpenInBrowserModal onClose={() => setShowBrowserModal(false)} />}
+      <Nav onSignIn={handleSignIn} />
+      <Hero onCta={handleSignIn} />
       <EditorShowcase />
       <Bento />
       <Steps />
-      <Roles onCta={googleLogin} />
-      <CTA onCta={googleLogin} />
+      <Roles onCta={handleSignIn} />
+      <CTA onCta={handleSignIn} />
       <Footer />
     </div>
   );
