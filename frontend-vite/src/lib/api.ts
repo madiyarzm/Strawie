@@ -68,8 +68,28 @@ export async function healthCheck(): Promise<any | null> {
 
 // --- Auth ---
 
+export function isInAppBrowser(): boolean {
+  const ua = navigator.userAgent;
+  // LinkedIn, Facebook, Instagram, Twitter/X in-app browsers all block Google OAuth (error 403 disallowed_useragent)
+  return /LinkedIn|FBAN|FBAV|FBIOS|Instagram|Twitter\/|Snapchat|MicroMessenger|Line\//.test(ua);
+}
+
 export function googleLogin(): void {
-  window.location.href = `${API_BASE}/api/v1/auth/google`;
+  const url = `${API_BASE}/api/v1/auth/google`;
+
+  if (!isInAppBrowser()) {
+    window.location.href = url;
+    return;
+  }
+
+  if (/Android/.test(navigator.userAgent)) {
+    // Android: intent:// URL forces the OS to open the URL in Chrome instead of the in-app WebView.
+    // Strips the https:// prefix because the intent scheme carries it separately.
+    window.location.href = `intent://${url.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;end`;
+  } else {
+    // iOS: window.open with _blank causes LinkedIn to hand off to Safari in most cases.
+    window.open(url, "_blank");
+  }
 }
 
 export async function getMe(): Promise<any> {
