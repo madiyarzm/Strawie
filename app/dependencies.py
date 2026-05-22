@@ -6,6 +6,7 @@ Keeps route handlers thin and testable.
 """
 
 import logging
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
@@ -82,6 +83,13 @@ def get_current_user(
     user = db.get(User, user_id)
     if user is None:
         raise credentials_exception
+    if user.is_banned:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been suspended.",
+        )
+    user.last_active_at = datetime.now(timezone.utc)
+    db.commit()
     return user
 
 

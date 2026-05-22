@@ -31,8 +31,14 @@ import {
   logout,
   updateMyCosmetics,
   updateUserRole,
+  getAdminStats,
+  toggleUserBan,
+  getFlaggedSubmissions,
+  getAdminInviteCodes,
+  revokeInviteCode,
+  getAdminGroups,
 } from "./lib/api";
-import { Play, Square, X, Users, Shield, LifeBuoy, Home, LogOut, Trophy, Flame, Gem, Zap, PenLine, Crown, Star, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Play, Square, X, Users, Shield, LifeBuoy, Home, LogOut, Trophy, Flame, Gem, Zap, PenLine, Crown, Star, Trash2, ChevronLeft, ChevronRight, Search, Ban, AlertTriangle, Eye, Key, BarChart3, FolderOpen, Clock } from "lucide-react";
 import { Confetti } from "./components/Confetti";
 import {
   onPyodideProgress,
@@ -388,8 +394,15 @@ export const MentorApp: React.FC = () => {
   const [showAddFileModal, setShowAddFileModal] = useState(false);
 
   const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [adminTab, setAdminTab] = useState<"overview" | "users" | "groups" | "security">("overview");
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
+  const [adminStats, setAdminStats] = useState<any>(null);
+  const [adminFlagged, setAdminFlagged] = useState<any[]>([]);
+  const [adminInviteCodes, setAdminInviteCodes] = useState<any[]>([]);
+  const [adminGroups, setAdminGroups] = useState<any[]>([]);
+  const [adminSearch, setAdminSearch] = useState("");
+  const [adminExpandedFlag, setAdminExpandedFlag] = useState<string | null>(null);
 
   const [xp, setXp] = useState<number | null>(null);
   const [activityDays, setActivityDays] = useState<{ date: string; count: number }[]>([]);
@@ -772,10 +785,21 @@ export const MentorApp: React.FC = () => {
 
   const handleOpenAdminPanel = async () => {
     setShowAdminPanel(true);
+    setAdminTab("overview");
     setAdminLoading(true);
     try {
-      const users = await listAllUsers();
+      const [users, stats, flagged, codes, groups] = await Promise.all([
+        listAllUsers(),
+        getAdminStats(),
+        getFlaggedSubmissions(),
+        getAdminInviteCodes(),
+        getAdminGroups(),
+      ]);
       setAdminUsers(users || []);
+      setAdminStats(stats);
+      setAdminFlagged(flagged || []);
+      setAdminInviteCodes(codes || []);
+      setAdminGroups(groups || []);
     } catch (e: any) { setError(e.message || t("app.errors.loadUsers")); } finally { setAdminLoading(false); }
   };
 
@@ -785,6 +809,20 @@ export const MentorApp: React.FC = () => {
       const updated = await updateUserRole(userId, newRole as "teacher" | "student");
       setAdminUsers(prev => prev.map(u => u.id === userId ? { ...u, role: updated.role } : u));
     } catch (e: any) { setError(e.message || t("app.errors.updateRole")); }
+  };
+
+  const handleToggleBan = async (userId: string, currentlyBanned: boolean) => {
+    try {
+      const updated = await toggleUserBan(userId, !currentlyBanned, !currentlyBanned ? "Banned by admin" : undefined);
+      setAdminUsers(prev => prev.map(u => u.id === userId ? { ...u, is_banned: updated.is_banned, ban_reason: updated.ban_reason } : u));
+    } catch (e: any) { setError(e.message || "Failed to update ban status"); }
+  };
+
+  const handleRevokeCode = async (groupId: string) => {
+    try {
+      await revokeInviteCode(groupId);
+      setAdminInviteCodes(prev => prev.filter(c => c.group_id !== groupId));
+    } catch (e: any) { setError(e.message || "Failed to revoke invite code"); }
   };
 
   const handleGetHint = async () => {
@@ -1202,51 +1240,337 @@ export const MentorApp: React.FC = () => {
       {showAdminPanel && (
         <div className="fixed inset-0 z-50 flex items-start justify-end" style={{ background: "oklch(0% 0 0 / 0.6)" }}>
           <div
-            className="h-full w-full max-w-md flex flex-col shadow-2xl"
-            style={{ background: "var(--bg-2)", borderLeft: "1px solid var(--border)" }}
+            className="h-full w-full flex flex-col shadow-2xl"
+            style={{ background: "var(--bg-2)", borderLeft: "1px solid var(--border)", maxWidth: 640 }}
           >
-            <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "var(--border)" }}>
               <div className="flex items-center gap-2">
                 <Shield className="h-4 w-4" style={{ color: "var(--amber)" }} />
-                <h2 className="text-sm font-semibold">{t("app.admin.title")}</h2>
+                <h2 className="text-sm font-semibold">Admin Panel</h2>
               </div>
-              <button onClick={() => setShowAdminPanel(false)} className="transition-colors" style={{ color: "var(--subtle)" }}>
+              <button onClick={() => setShowAdminPanel(false)} style={{ color: "var(--subtle)", background: "none", border: "none", cursor: "pointer" }}>
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex-1 overflow-auto divide-y" style={{ borderColor: "var(--border)" }}>
+
+            {/* Tabs */}
+            <div className="flex border-b" style={{ borderColor: "var(--border)" }}>
+              {([
+                ["overview", "Overview", BarChart3],
+                ["users", "Users", Users],
+                ["groups", "Groups", FolderOpen],
+                ["security", "Security", AlertTriangle],
+              ] as const).map(([id, label, Icon]) => (
+                <button
+                  key={id}
+                  onClick={() => setAdminTab(id as any)}
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-colors"
+                  style={{
+                    color: adminTab === id ? "var(--indigo)" : "var(--muted)",
+                    borderBottom: adminTab === id ? "2px solid var(--indigo)" : "2px solid transparent",
+                    background: "none", border: "none", borderBottomStyle: "solid", borderBottomWidth: 2,
+                    borderBottomColor: adminTab === id ? "var(--indigo)" : "transparent",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Icon className="h-3.5 w-3.5" />{label}
+                </button>
+              ))}
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-auto">
               {adminLoading ? (
                 <div className="flex items-center justify-center h-32 text-sm gap-2" style={{ color: "var(--muted)" }}>
                   <span className="h-4 w-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--indigo)", borderTopColor: "transparent" }} />
-                  {t("app.admin.loadingUsers")}
+                  Loading...
                 </div>
               ) : (
-                adminUsers.map(u => (
-                  <div key={u.id} className="flex items-center justify-between px-5 py-3">
-                    <div className="min-w-0 flex items-center gap-2.5">
-                      <Avatar name={u.name || u.email} size={28} />
-                      <div>
-                        <div className="text-sm font-medium truncate">{u.name}</div>
-                        <div className="text-xs truncate" style={{ color: "var(--subtle)" }}>{u.email}</div>
+                <>
+                  {/* ── Overview tab ─────────────────────────────── */}
+                  {adminTab === "overview" && adminStats && (
+                    <div className="p-5 space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { label: "Total Users", value: adminStats.total_users, icon: Users },
+                          { label: "Active Today", value: adminStats.active_today, icon: Zap },
+                          { label: "Signups (7d)", value: adminStats.signups_week, icon: Clock },
+                          { label: "Banned", value: adminStats.banned_count, icon: Ban },
+                          { label: "Groups", value: adminStats.total_groups, icon: FolderOpen },
+                          { label: "Classrooms", value: adminStats.total_classrooms, icon: Home },
+                          { label: "Submissions", value: adminStats.total_submissions, icon: PenLine },
+                          { label: "Today", value: adminStats.submissions_today, icon: BarChart3 },
+                          { label: "This Week", value: adminStats.submissions_week, icon: Flame },
+                          { label: "Pass Rate", value: `${adminStats.pass_rate}%`, icon: Trophy },
+                        ].map(({ label, value, icon: StatIcon }) => (
+                          <div key={label} className="rounded-lg p-3" style={{ background: "var(--bg-3)", border: "1px solid var(--border)" }}>
+                            <div className="flex items-center gap-2 mb-1">
+                              <StatIcon className="h-3.5 w-3.5" style={{ color: "var(--muted)" }} />
+                              <span className="text-[11px]" style={{ color: "var(--muted)" }}>{label}</span>
+                            </div>
+                            <div className="text-lg font-semibold" style={{ color: "var(--text)" }}>{value}</div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-3">
-                      <Badge type={u.role === "teacher" ? "in-progress" : "default"} label={t(`common.${u.role}`)} />
-                      {u.email !== "madiyar.zmm@gmail.com" && (
-                        <button
-                          onClick={() => handleToggleRole(u.id, u.role)}
-                          className="text-[11px] px-2 py-1 rounded-[8px] border transition-colors"
-                          style={{ border: "1px solid var(--border)", color: "var(--muted)" }}
-                        >
-                          {u.role === "teacher" ? t("app.admin.toStudent") : t("app.admin.toTeacher")}
-                        </button>
-                      )}
+                  )}
+
+                  {/* ── Users tab ────────────────────────────────── */}
+                  {adminTab === "users" && (
+                    <div>
+                      <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: "var(--muted)" }} />
+                          <input
+                            type="text"
+                            value={adminSearch}
+                            onChange={e => setAdminSearch(e.target.value)}
+                            placeholder="Search users..."
+                            className="w-full pl-8 pr-3 py-2 rounded-lg text-xs"
+                            style={{ background: "var(--bg-3)", border: "1px solid var(--border)", color: "var(--text)", outline: "none" }}
+                          />
+                        </div>
+                      </div>
+                      <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+                        {adminUsers
+                          .filter(u => {
+                            if (!adminSearch) return true;
+                            const q = adminSearch.toLowerCase();
+                            return u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
+                          })
+                          .map(u => (
+                            <div key={u.id} className="flex items-center justify-between px-4 py-3">
+                              <div className="min-w-0 flex items-center gap-2.5">
+                                <div className="relative">
+                                  <Avatar name={u.name || u.email} size={28} />
+                                  {u.is_banned && (
+                                    <div className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full flex items-center justify-center" style={{ background: "var(--rose)" }}>
+                                      <Ban className="h-2 w-2" style={{ color: "white" }} />
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="text-xs font-medium truncate" style={{ color: u.is_banned ? "var(--muted)" : "var(--text)", textDecoration: u.is_banned ? "line-through" : "none" }}>{u.name}</div>
+                                  <div className="text-[11px] truncate" style={{ color: "var(--subtle)" }}>{u.email}</div>
+                                  {u.last_active_at && (
+                                    <div className="text-[10px]" style={{ color: "var(--subtle)" }}>
+                                      Last active: {new Date(u.last_active_at).toLocaleDateString()}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0 ml-3">
+                                <Badge type={u.role === "teacher" ? "in-progress" : "default"} label={u.role} />
+                                {u.email !== "madiyar.zmm@gmail.com" && (
+                                  <>
+                                    <button
+                                      onClick={() => handleToggleRole(u.id, u.role)}
+                                      className="text-[10px] px-1.5 py-0.5 rounded-md transition-colors"
+                                      style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "none", cursor: "pointer" }}
+                                    >
+                                      {u.role === "teacher" ? "→ Student" : "→ Teacher"}
+                                    </button>
+                                    <button
+                                      onClick={() => handleToggleBan(u.id, u.is_banned)}
+                                      className="text-[10px] px-1.5 py-0.5 rounded-md transition-colors"
+                                      style={{
+                                        border: "1px solid",
+                                        borderColor: u.is_banned ? "var(--emerald)" : "var(--rose)",
+                                        color: u.is_banned ? "var(--emerald)" : "var(--rose)",
+                                        background: "none", cursor: "pointer",
+                                      }}
+                                    >
+                                      {u.is_banned ? "Unban" : "Ban"}
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        {adminUsers.length === 0 && (
+                          <div className="px-5 py-8 text-center text-xs" style={{ color: "var(--subtle)" }}>No users found</div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-              {!adminLoading && adminUsers.length === 0 && (
-                <div className="px-5 py-8 text-center text-xs" style={{ color: "var(--subtle)" }}>{t("app.admin.noUsers")}</div>
+                  )}
+
+                  {/* ── Groups tab ───────────────────────────────── */}
+                  {adminTab === "groups" && (
+                    <div className="p-4 space-y-3">
+                      {adminGroups.length === 0 && (
+                        <div className="py-8 text-center text-xs" style={{ color: "var(--subtle)" }}>No groups yet</div>
+                      )}
+                      {adminGroups.map((g: any) => (
+                        <div key={g.id} className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)", background: "var(--bg-3)" }}>
+                          <div className="px-4 py-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="text-sm font-medium" style={{ color: "var(--text)" }}>{g.name}</div>
+                                <div className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>
+                                  by {g.teacher_name} &middot; {g.member_count} members
+                                  {g.invite_code && <span> &middot; Code: <code className="px-1 py-0.5 rounded text-[10px]" style={{ background: "var(--bg-2)" }}>{g.invite_code}</code></span>}
+                                </div>
+                              </div>
+                              <Eye className="h-3.5 w-3.5" style={{ color: "var(--muted)" }} />
+                            </div>
+                          </div>
+                          {g.classrooms?.length > 0 && (
+                            <div className="border-t" style={{ borderColor: "var(--border)" }}>
+                              {g.classrooms.map((c: any) => (
+                                <div key={c.id} className="px-4 py-2 flex items-center gap-2 text-xs" style={{ color: "var(--text-3)" }}>
+                                  <FolderOpen className="h-3 w-3" style={{ color: "var(--muted)" }} />
+                                  {c.name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ── Security tab ─────────────────────────────── */}
+                  {adminTab === "security" && (
+                    <div className="p-4 space-y-5">
+                      {/* Flagged submissions */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <AlertTriangle className="h-3.5 w-3.5" style={{ color: "var(--amber)" }} />
+                          <h3 className="text-xs font-semibold" style={{ color: "var(--text)" }}>
+                            Flagged Submissions ({adminFlagged.length})
+                          </h3>
+                        </div>
+                        {adminFlagged.length === 0 ? (
+                          <div className="rounded-lg p-4 text-center text-xs" style={{ background: "var(--bg-3)", border: "1px solid var(--border)", color: "var(--subtle)" }}>
+                            No suspicious code detected in the last 7 days
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {adminFlagged.map((f: any) => (
+                              <div key={f.submission_id} className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)", background: "var(--bg-3)" }}>
+                                <button
+                                  onClick={() => setAdminExpandedFlag(adminExpandedFlag === f.submission_id ? null : f.submission_id)}
+                                  className="w-full text-left px-3 py-2.5 flex items-center justify-between"
+                                  style={{ background: "none", border: "none", cursor: "pointer" }}
+                                >
+                                  <div>
+                                    <div className="text-xs font-medium" style={{ color: "var(--text)" }}>{f.user_name}</div>
+                                    <div className="text-[10px]" style={{ color: "var(--muted)" }}>
+                                      {f.user_email} &middot; {new Date(f.submitted_at).toLocaleString()}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    {f.flags.slice(0, 3).map((fl: any, i: number) => (
+                                      <span key={i} className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "oklch(0.7 0.15 25 / 0.15)", color: "var(--rose)" }}>
+                                        {fl.label}
+                                      </span>
+                                    ))}
+                                    {f.flags.length > 3 && (
+                                      <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "var(--bg-2)", color: "var(--muted)" }}>
+                                        +{f.flags.length - 3}
+                                      </span>
+                                    )}
+                                  </div>
+                                </button>
+                                {adminExpandedFlag === f.submission_id && (
+                                  <div className="border-t px-3 py-2" style={{ borderColor: "var(--border)" }}>
+                                    <div className="mb-2">
+                                      {f.flags.map((fl: any, i: number) => (
+                                        <div key={i} className="text-[11px] py-1 flex items-start gap-2">
+                                          <span style={{ color: "var(--rose)" }}>L{fl.line}</span>
+                                          <code className="flex-1 text-[10px] break-all" style={{ color: "var(--text-3)" }}>{fl.snippet}</code>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <details className="text-[10px]">
+                                      <summary style={{ color: "var(--muted)", cursor: "pointer" }}>View full code</summary>
+                                      <pre className="mt-1 p-2 rounded text-[10px] overflow-x-auto" style={{ background: "var(--bg-1)", color: "var(--text-3)", maxHeight: 200 }}>
+                                        {f.code}
+                                      </pre>
+                                    </details>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Invite codes */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Key className="h-3.5 w-3.5" style={{ color: "var(--indigo)" }} />
+                          <h3 className="text-xs font-semibold" style={{ color: "var(--text)" }}>
+                            Active Invite Codes ({adminInviteCodes.length})
+                          </h3>
+                        </div>
+                        {adminInviteCodes.length === 0 ? (
+                          <div className="rounded-lg p-4 text-center text-xs" style={{ background: "var(--bg-3)", border: "1px solid var(--border)", color: "var(--subtle)" }}>
+                            No active invite codes
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {adminInviteCodes.map((c: any) => (
+                              <div key={c.group_id} className="rounded-lg flex items-center justify-between px-3 py-2.5" style={{ background: "var(--bg-3)", border: "1px solid var(--border)" }}>
+                                <div>
+                                  <div className="text-xs font-medium" style={{ color: "var(--text)" }}>{c.group_name}</div>
+                                  <div className="text-[10px]" style={{ color: "var(--muted)" }}>
+                                    by {c.teacher_name} &middot; {c.member_count} members &middot;
+                                    <code className="ml-1 px-1 py-0.5 rounded" style={{ background: "var(--bg-2)" }}>{c.invite_code}</code>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => handleRevokeCode(c.group_id)}
+                                  className="text-[10px] px-2 py-1 rounded-md"
+                                  style={{ border: "1px solid var(--rose)", color: "var(--rose)", background: "none", cursor: "pointer" }}
+                                >
+                                  Revoke
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Banned users summary */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Ban className="h-3.5 w-3.5" style={{ color: "var(--rose)" }} />
+                          <h3 className="text-xs font-semibold" style={{ color: "var(--text)" }}>
+                            Banned Users ({adminUsers.filter(u => u.is_banned).length})
+                          </h3>
+                        </div>
+                        {adminUsers.filter(u => u.is_banned).length === 0 ? (
+                          <div className="rounded-lg p-4 text-center text-xs" style={{ background: "var(--bg-3)", border: "1px solid var(--border)", color: "var(--subtle)" }}>
+                            No banned users
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {adminUsers.filter(u => u.is_banned).map(u => (
+                              <div key={u.id} className="rounded-lg flex items-center justify-between px-3 py-2.5" style={{ background: "var(--bg-3)", border: "1px solid var(--border)" }}>
+                                <div className="flex items-center gap-2">
+                                  <Avatar name={u.name || u.email} size={24} />
+                                  <div>
+                                    <div className="text-xs" style={{ color: "var(--text)", textDecoration: "line-through" }}>{u.name}</div>
+                                    <div className="text-[10px]" style={{ color: "var(--muted)" }}>{u.email}</div>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => handleToggleBan(u.id, true)}
+                                  className="text-[10px] px-2 py-1 rounded-md"
+                                  style={{ border: "1px solid var(--emerald)", color: "var(--emerald)", background: "none", cursor: "pointer" }}
+                                >
+                                  Unban
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

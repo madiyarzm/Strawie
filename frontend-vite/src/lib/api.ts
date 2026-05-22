@@ -143,6 +143,34 @@ export async function updateUserRole(userId: string, role: "teacher" | "student"
   return apiClient.patch(`/api/v1/users/${userId}/role`, { role });
 }
 
+export async function getAdminStats(): Promise<any> {
+  return apiClient.get("/api/v1/admin/stats");
+}
+
+export async function toggleUserBan(userId: string, is_banned: boolean, reason?: string): Promise<any> {
+  return apiClient.patch(`/api/v1/admin/users/${userId}/ban`, { is_banned, reason });
+}
+
+export async function getRecentSignups(): Promise<any[]> {
+  return apiClient.get("/api/v1/admin/recent-signups");
+}
+
+export async function getFlaggedSubmissions(days: number = 7): Promise<any[]> {
+  return apiClient.get(`/api/v1/admin/flagged-submissions?days=${days}`);
+}
+
+export async function getAdminInviteCodes(): Promise<any[]> {
+  return apiClient.get("/api/v1/admin/invite-codes");
+}
+
+export async function revokeInviteCode(groupId: string): Promise<any> {
+  return apiClient.delete(`/api/v1/admin/invite-codes/${groupId}`);
+}
+
+export async function getAdminGroups(): Promise<any[]> {
+  return apiClient.get("/api/v1/admin/groups");
+}
+
 // --- Groups ---
 
 export async function listGroups(): Promise<any[]> {

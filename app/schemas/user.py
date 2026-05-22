@@ -28,6 +28,9 @@ class UserRead(UserBase):
     id: UUID
     picture_url: HttpUrl | None = None
     role_locked: bool
+    is_banned: bool = False
+    ban_reason: str | None = None
+    last_active_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
