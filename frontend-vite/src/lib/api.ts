@@ -70,7 +70,6 @@ export async function healthCheck(): Promise<any | null> {
 
 export function isInAppBrowser(): boolean {
   const ua = navigator.userAgent;
-  const w = window as any;
 
   // Named app patterns (works when present)
   if (/LinkedIn|FBAN|FBAV|FBIOS|Instagram|Twitter\/|Snapchat|MicroMessenger|Line\//.test(ua)) return true;
