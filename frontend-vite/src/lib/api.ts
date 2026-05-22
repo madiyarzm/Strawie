@@ -78,15 +78,10 @@ export function isInAppBrowser(): boolean {
   // Android WebView marker: Chrome UA includes "; wv)" when running inside a WebView
   if (/Android/.test(ua) && /; wv\)/.test(ua)) return true;
 
-  // iOS: real Safari exposes window.safari.pushNotification; every in-app WKWebView omits it.
-  // Exclude known real iOS browsers (Chrome, Firefox, Edge, Opera) which also lack window.safari.
+  // iOS: in-app WebViews include "AppleWebKit" but omit the "Safari/" token in the UA.
+  // Real Safari and other known iOS browsers (Chrome, Firefox, Edge, Opera) always include it.
   if (/iPhone|iPad|iPod/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)) {
-    try {
-      w.safari.pushNotification.toString();
-      return false; // threw or succeeded — it's real Safari either way
-    } catch {
-      return true; // property missing entirely: in-app WebView
-    }
+    if (/AppleWebKit/.test(ua) && !/Safari\//.test(ua)) return true;
   }
 
   return false;
