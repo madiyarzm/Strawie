@@ -5,7 +5,7 @@ Used by the /sandbox/run endpoint. Real execution will be added
 when Docker-based isolation is implemented.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SandboxRunRequest(BaseModel):
@@ -17,8 +17,8 @@ class SandboxRunRequest(BaseModel):
         stdin: Optional text to feed as standard input (for input() calls).
     """
 
-    code: str
-    stdin: str = ""
+    code: str = Field(max_length=100_000)
+    stdin: str = Field(default="", max_length=10_000)
 
 
 class SandboxRunResponse(BaseModel):

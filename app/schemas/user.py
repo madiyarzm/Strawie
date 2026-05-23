@@ -7,7 +7,7 @@ Used to control what user data is returned to clients.
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 
 
 class UserBase(BaseModel):
@@ -49,7 +49,7 @@ class RoleChoice(BaseModel):
     ``role_locked`` was False — repeated calls return 409.
     """
 
-    role: str
+    role: str = Field(max_length=20)
 
 
 class TokenResponse(BaseModel):
@@ -66,7 +66,7 @@ class UserRoleUpdate(BaseModel):
     Request body for updating a user's role. Admin-only.
     """
 
-    role: str
+    role: str = Field(max_length=20)
 
     class Config:
         json_schema_extra = {"example": {"role": "teacher"}}

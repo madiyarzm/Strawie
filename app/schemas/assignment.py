@@ -8,7 +8,7 @@ their code and the sandbox execution result.
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AssignmentBase(BaseModel):
@@ -16,10 +16,10 @@ class AssignmentBase(BaseModel):
     Shared fields for assignment creation and updates.
     """
 
-    title: str
-    description: str | None = None
-    template_code: str | None = None
-    test_code: str | None = None
+    title: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=10_000)
+    template_code: str | None = Field(default=None, max_length=50_000)
+    test_code: str | None = Field(default=None, max_length=50_000)
     due_at: datetime | None = None
 
 
@@ -54,7 +54,7 @@ class SubmissionBase(BaseModel):
     Shared payload fields for code submissions.
     """
 
-    code: str
+    code: str = Field(max_length=100_000)
 
 
 class SubmissionCreate(SubmissionBase):

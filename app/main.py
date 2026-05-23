@@ -117,8 +117,8 @@ def create_app() -> FastAPI:
         try:
             db.execute(text("SELECT 1"))
             return {"status": "ok", "service": "chalk"}
-        except Exception as exc:
-            return {"status": "db_error", "detail": str(exc)}
+        except Exception:
+            return {"status": "db_error"}
         finally:
             db.close()
 
@@ -130,9 +130,8 @@ def create_app() -> FastAPI:
 
         @app.get("/{full_path:path}", include_in_schema=False)
         async def serve_spa(full_path: str) -> FileResponse:
-            # Serve real files (favicon, manifest, etc.) if they exist.
-            candidate = FRONTEND_DIR / full_path
-            if candidate.exists() and candidate.is_file():
+            candidate = (FRONTEND_DIR / full_path).resolve()
+            if candidate.is_relative_to(FRONTEND_DIR) and candidate.is_file():
                 return FileResponse(str(candidate))
             return FileResponse(str(FRONTEND_DIR / "index.html"))
 

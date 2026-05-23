@@ -5,14 +5,14 @@ Pydantic schemas for Group and GroupMembership entities.
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class GroupCreate(BaseModel):
     """Payload for creating a new group."""
 
-    name: str
-    description: str | None = None
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
 
 
 class GroupRead(BaseModel):
@@ -34,7 +34,7 @@ class GroupRead(BaseModel):
 class JoinGroupRequest(BaseModel):
     """Payload for joining a group via invite code."""
 
-    invite_code: str
+    invite_code: str = Field(min_length=1, max_length=50)
 
 
 class GroupMemberRead(BaseModel):

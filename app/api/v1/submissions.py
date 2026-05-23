@@ -8,7 +8,7 @@ and human-readable status for the UI.
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.limiter import limiter
 from app.dependencies import CurrentUser, DBSession
@@ -28,7 +28,7 @@ router = APIRouter()
 
 
 class FeedbackPayload(BaseModel):
-    feedback: str
+    feedback: str = Field(max_length=5000)
 
 
 def _submission_to_read(submission: Submission, submitter_name: str = "", submitter_email: str | None = None) -> SubmissionRead:

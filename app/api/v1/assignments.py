@@ -7,7 +7,7 @@ All endpoints are protected and use the current authenticated user.
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.limiter import limiter, user_or_ip
 from app.dependencies import CurrentUser, DBSession
@@ -19,8 +19,8 @@ router = APIRouter()
 
 
 class HintRequest(BaseModel):
-    code: str
-    attempt_number: int = 1
+    code: str = Field(max_length=100_000)
+    attempt_number: int = Field(default=1, ge=1, le=1000)
 
 
 @router.get("/", response_model=list[AssignmentRead])

@@ -83,6 +83,10 @@ def choose_role(
 # Cosmetics
 # ---------------------------------------------------------------------------
 
+_ALLOWED_COSMETIC_KEYS = {"frame", "background", "aura"}
+_MAX_COSMETIC_VALUE_LEN = 64
+
+
 class CosmeticsUpdate(BaseModel):
     cosmetics: dict
 
@@ -96,7 +100,14 @@ def get_cosmetics(current_user: CurrentUser) -> dict:
 @router.put("/me/cosmetics")
 def update_cosmetics(body: CosmeticsUpdate, current_user: CurrentUser, db: DBSession) -> dict:
     """Update the authenticated user's cosmetics settings."""
-    current_user.cosmetics = body.cosmetics
+    sanitized: dict[str, str] = {}
+    for k, v in body.cosmetics.items():
+        if k not in _ALLOWED_COSMETIC_KEYS:
+            continue
+        if not isinstance(v, str) or len(v) > _MAX_COSMETIC_VALUE_LEN:
+            continue
+        sanitized[k] = v
+    current_user.cosmetics = sanitized
     db.commit()
     db.refresh(current_user)
     return current_user.cosmetics or {}
