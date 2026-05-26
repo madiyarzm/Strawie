@@ -476,7 +476,7 @@ export const MentorApp: React.FC = () => {
       }
     };
     void init();
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     if (!currentAssignment) return;
@@ -487,10 +487,10 @@ export const MentorApp: React.FC = () => {
         setSelectedSubmission((prev: any) =>
           prev ? (subs || []).find((s: any) => s.id === prev.id) ?? prev : null,
         );
-      } catch {}
+      } catch { /* ignore polling errors */ }
     }, 5_000);
     return () => clearInterval(id);
-  }, [currentAssignment?.id]);
+  }, [currentAssignment]);
 
   useEffect(() => {
     if (!authChecked) return;
@@ -2260,6 +2260,9 @@ const SubmissionDetailPanel: React.FC<SubmissionDetailPanelProps> = ({
 
   useEffect(() => {
     setFeedbackDraft(submission?.feedback || "");
+  // feedback intentionally excluded — we only reset the draft when switching
+  // to a different submission, not on every server-side feedback update
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submission?.id]);
 
   const result = (submission.result_json || {}) as Record<string, any>;

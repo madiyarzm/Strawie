@@ -16,6 +16,8 @@ function rand(min: number, max: number) {
 export const Confetti: React.FC<ConfettiProps> = ({ active, onDone }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<number>(0);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
 
   useEffect(() => {
     if (!active) return;
@@ -89,7 +91,7 @@ export const Confetti: React.FC<ConfettiProps> = ({ active, onDone }) => {
         frameRef.current = requestAnimationFrame(draw);
       } else {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        onDone?.();
+        onDoneRef.current?.();
       }
     };
 

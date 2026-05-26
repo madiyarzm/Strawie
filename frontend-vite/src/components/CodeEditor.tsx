@@ -4,7 +4,7 @@
  * Renders colored cursors and selections of other participants via Yjs Awareness.
  */
 
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useMemo, useRef, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import CodeMirror from "@uiw/react-codemirror";
@@ -150,12 +150,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   errorLines,
 }) => {
   const { t } = useTranslation();
-  const ydocRef = useRef<Y.Doc | null>(null);
+  const [ydoc] = useState<Y.Doc>(() => new Y.Doc());
   const viewRef = useRef<EditorView | null>(null);
-  if (!ydocRef.current) {
-    ydocRef.current = new Y.Doc();
-  }
-  const ydoc = ydocRef.current;
   const ytext = useMemo(() => ydoc.getText("code"), [ydoc]);
 
   const { awareness, peers, setHandRaised } = useCollab(roomId, ydoc, value, userName, userRole);
