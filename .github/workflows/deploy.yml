@@ -75,7 +75,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend-vite/package-lock.json
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts --omit=optional
         working-directory: frontend-vite
 
       - run: npx tsc --noEmit
