@@ -80,3 +80,6 @@ jobs:
 
       - run: npx tsc --noEmit
         working-directory: frontend-vite
+
+      - run: npm run lint
+        working-directory: frontend-vite
