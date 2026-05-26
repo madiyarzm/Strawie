@@ -58,7 +58,7 @@ jobs:
             "https://api.northflank.com/v1/projects/${{ secrets.NORTHFLANK_PROJECT_ID }}/services/${{ secrets.NORTHFLANK_SERVICE_ID }}/build" \
             -H "Authorization: Bearer ${{ secrets.NORTHFLANK_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{"branch": "main"}'
+            -d '{"sha": "${{ github.sha }}"}'
           echo "Build triggered on Northflank."
 
   # ── Run frontend type-check ──────────────────────────────────────────────────
