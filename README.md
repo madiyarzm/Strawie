@@ -57,7 +57,7 @@
 ### 1. Defense-in-depth code execution
 Student code never runs in the app process. Three isolation strategies share one `SandboxExecutor` interface:
 - **Subprocess (default)** — stripped builtins (`open`, `exec`, `eval`…), a module allowlist, an **env-var allowlist** so secrets are unreachable from inside the sandbox, plus wall-clock and output caps.
-- **Docker (optional)** — `--network=none`, read-only FS, memory/PID limits, non-root user.
+- **Docker (optional )** — `--network=none`, read-only FS, memory/PID limits, non-root user.
 - **Pyodide (in-browser WASM)** — graded submissions run client-side, fully off the server.
 
 A streaming WebSocket sandbox (`/ws/sandbox/run`) adds **interactive stdin** — programs pause on `input()` and the user types in the terminal, VS Code style.
