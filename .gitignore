@@ -58,3 +58,4 @@ insights.md
 # Accidental paste from terminal (Docker output etc.)
 /sha256:*
 
+docs/workflow_optimization.md
