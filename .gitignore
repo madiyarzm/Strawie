@@ -59,3 +59,6 @@ insights.md
 /sha256:*
 
 docs/workflow_optimization.md
+docs/tech-debt.md
+docs/sandbox-docker.md
+docs/phase1-architecture.md
