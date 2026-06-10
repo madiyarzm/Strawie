@@ -145,7 +145,7 @@ export function useCollabDrawing(
       updated: number[];
       removed: number[];
     }) => {
-      if (added.length > 0 && socket.readyState === WebSocket.OPEN) {
+      if (added.length > 0 && socket && socket.readyState === WebSocket.OPEN) {
         // Re-send doc state AND our awareness so late-joiners see everything.
         taggedSend(TAG_DOC, Y.encodeStateAsUpdate(doc));
         taggedSend(TAG_AWARENESS, encodeAwarenessUpdate(aw, [doc.clientID]));
@@ -169,38 +169,35 @@ export function useCollabDrawing(
     // automatically with the handshake. In dev, Vite proxies /ws → backend.
     const wsBase = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
     const url = `${wsBase}/ws/collab/${encodeURIComponent(roomId)}`;
-    const socket = new WebSocket(url);
-    socket.binaryType = "arraybuffer";
+
+    // Stable origin token for updates we apply off the wire, so our own
+    // doc/awareness "update" handlers don't echo them straight back. Keyed on
+    // a fixed object (not the socket) so echo-suppression survives reconnects,
+    // which replace the socket instance.
+    const wsOrigin = {};
+
+    let socket: WebSocket | null = null;
+    let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnectAttempts = 0;
+    let disposed = false;
 
     function taggedSend(tag: number, payload: Uint8Array) {
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
       const msg = new Uint8Array(1 + payload.length);
       msg[0] = tag;
       msg.set(payload, 1);
       socket.send(msg);
     }
 
-    let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
-
-    socket.addEventListener("open", () => {
-      taggedSend(TAG_DOC, Y.encodeStateAsUpdate(doc));
-      taggedSend(TAG_AWARENESS, encodeAwarenessUpdate(aw, [doc.clientID]));
-
-      heartbeatInterval = setInterval(() => {
-        if (socket.readyState === WebSocket.OPEN) {
-          taggedSend(TAG_AWARENESS, encodeAwarenessUpdate(aw, [doc.clientID]));
-        }
-      }, 10_000);
-    });
-
     const handleDocUpdate = (update: Uint8Array, origin: unknown) => {
-      if (origin === socket || socket.readyState !== WebSocket.OPEN) return;
+      if (origin === wsOrigin) return;
       taggedSend(TAG_DOC, update);
     };
 
     const handleAwarenessUpdate = ({
       added, updated, removed,
     }: { added: number[]; updated: number[]; removed: number[] }) => {
-      if (socket.readyState !== WebSocket.OPEN) return;
       const changed = added.concat(updated, removed);
       // When a new peer appears, also re-broadcast our own state so they see us.
       if (added.length > 0 && !changed.includes(doc.clientID)) {
@@ -215,33 +212,94 @@ export function useCollabDrawing(
       const tag = raw[0];
       const payload = raw.slice(1);
       if (tag === TAG_DOC) {
-        Y.applyUpdate(doc, payload, socket);
+        Y.applyUpdate(doc, payload, wsOrigin);
       } else if (tag === TAG_AWARENESS) {
-        applyAwarenessUpdate(aw, payload, socket);
+        applyAwarenessUpdate(aw, payload, wsOrigin);
       }
     };
 
-    socket.addEventListener("message", handleMessage);
+    // Reconnect with exponential backoff (capped). Without this, a single
+    // dropped socket — proxy idle timeout, server recycle, network blip —
+    // permanently kills collaboration: local drawing keeps working but peers
+    // silently stop seeing each other's strokes.
+    const scheduleReconnect = () => {
+      if (disposed || reconnectTimer) return;
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+      }
+      const delay = Math.min(1000 * 2 ** reconnectAttempts, 15_000) + Math.random() * 500;
+      reconnectAttempts += 1;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, delay);
+    };
+
+    const onOpen = () => {
+      reconnectAttempts = 0;
+      // (Re)sync full doc + awareness. On a reconnect this replays strokes
+      // drawn while disconnected (Yjs/CRDT merges cleanly) and prompts peers
+      // to re-send theirs when they see us reappear.
+      taggedSend(TAG_DOC, Y.encodeStateAsUpdate(doc));
+      taggedSend(TAG_AWARENESS, encodeAwarenessUpdate(aw, [doc.clientID]));
+
+      heartbeatInterval = setInterval(() => {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          taggedSend(TAG_AWARENESS, encodeAwarenessUpdate(aw, [doc.clientID]));
+        }
+      }, 10_000);
+    };
+
+    const onClose = () => {
+      if (disposed) return;
+      scheduleReconnect();
+    };
+
+    const onError = () => {
+      // Force-close so the `close` handler drives the single reconnect path.
+      try { socket?.close(); } catch { /* already closing */ }
+    };
+
+    function connect() {
+      if (disposed) return;
+      const s = new WebSocket(url);
+      s.binaryType = "arraybuffer";
+      socket = s;
+      s.addEventListener("open", onOpen);
+      s.addEventListener("message", handleMessage);
+      s.addEventListener("close", onClose);
+      s.addEventListener("error", onError);
+    }
+
     doc.on("update", handleDocUpdate);
     aw.on("update", handleAwarenessUpdate);
+    connect();
 
     return () => {
+      disposed = true;
       if (heartbeatInterval) clearInterval(heartbeatInterval);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       awarenessRef.current = null;
       doc.off("update", handleDocUpdate);
       doc.off("update", onDocUpdate);
       aw.off("update", handleAwarenessUpdate);
       aw.off("change", syncPeerCursors);
-      socket.removeEventListener("message", handleMessage);
       ystrokes.unobserve(syncStrokes);
+      if (socket) {
+        socket.removeEventListener("open", onOpen);
+        socket.removeEventListener("message", handleMessage);
+        socket.removeEventListener("close", onClose);
+        socket.removeEventListener("error", onError);
+        if (
+          socket.readyState === WebSocket.OPEN ||
+          socket.readyState === WebSocket.CONNECTING
+        ) {
+          socket.close();
+        }
+      }
       aw.destroy();
       setPeerCursors([]);
-      if (
-        socket.readyState === WebSocket.OPEN ||
-        socket.readyState === WebSocket.CONNECTING
-      ) {
-        socket.close();
-      }
     };
   }, [roomId, userName, userRole]);
 
