@@ -38,7 +38,7 @@ import {
   revokeInviteCode,
   getAdminGroups,
 } from "./lib/api";
-import { Play, Square, X, Users, Shield, LifeBuoy, Home, LogOut, Trophy, Flame, Gem, Zap, PenLine, Crown, Star, Trash2, ChevronLeft, ChevronRight, Search, Ban, AlertTriangle, Eye, Key, BarChart3, FolderOpen, Clock } from "lucide-react";
+import { Play, Square, X, Users, Shield, LifeBuoy, Home, LogOut, Trophy, Flame, Gem, Zap, PenLine, Crown, Star, Trash2, ChevronLeft, ChevronRight, Search, Ban, AlertTriangle, Eye, Key, BarChart3, FolderOpen, Clock, Sun, Moon, Inbox } from "lucide-react";
 import { Confetti } from "./components/Confetti";
 import {
   onPyodideProgress,
@@ -360,6 +360,24 @@ type EditorFile = {
   name: string;
   content: string;
 };
+
+// Shared empty-state block: a soft icon chip, a one-line title, an optional
+// hint, and an optional action — so "nothing here yet" reads as intentional.
+const EmptyState: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  hint?: string;
+  action?: React.ReactNode;
+}> = ({ icon, title, hint, action }) => (
+  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, textAlign: "center", padding: "40px 20px" }}>
+    <div style={{ display: "grid", placeItems: "center", width: 42, height: 42, borderRadius: 12, background: "var(--bg-2)", border: "1px solid var(--border)", color: "var(--subtle)" }}>
+      {icon}
+    </div>
+    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-2)" }}>{title}</div>
+    {hint && <div style={{ fontSize: 12, color: "var(--text-3)", maxWidth: 260, lineHeight: 1.5 }}>{hint}</div>}
+    {action && <div style={{ marginTop: 4 }}>{action}</div>}
+  </div>
+);
 
 
 export const MentorApp: React.FC = () => {
@@ -917,10 +935,11 @@ export const MentorApp: React.FC = () => {
             {!sidebarCollapsed && (
               <button
                 onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}
-                style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 8, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-3)", fontSize: 14 }}
+                className="sidebar-icon-btn"
+                style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 8, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-3)" }}
                 title={t("app.sidebar.toggleTheme")}
               >
-                {theme === "dark" ? "☀" : "☾"}
+                {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
               </button>
             )}
             <button
@@ -945,7 +964,11 @@ export const MentorApp: React.FC = () => {
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
                 title={sidebarCollapsed ? item.label : undefined}
+                className="sidebar-nav-item"
+                data-active={isActive}
+                data-disabled={isDisabled}
                 style={{
+                  position: "relative",
                   display: "flex", alignItems: "center", gap: 10,
                   padding: sidebarCollapsed ? "9px 0" : "9px 12px",
                   justifyContent: sidebarCollapsed ? "center" : "flex-start",
@@ -954,7 +977,7 @@ export const MentorApp: React.FC = () => {
                   color: isActive ? "var(--indigo)" : isDisabled ? "var(--border-2)" : "var(--text-3)",
                   cursor: isDisabled ? "default" : "pointer",
                   fontSize: 13, fontWeight: isActive ? 600 : 500, textAlign: "left",
-                  transition: "background 120ms",
+                  transition: "background 160ms ease, color 160ms ease",
                 }}
               >
                 <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
@@ -2188,9 +2211,11 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({
               );
             })}
             {assignments.length === 0 && (
-              <div style={{ textAlign: "center", padding: "48px 0", fontSize: 13, color: "var(--text-3)" }}>
-                {t("app.classroom.noAssignments")}{canCreate ? t("app.classroom.noAssignmentsHint") : ""}
-              </div>
+              <EmptyState
+                icon={<FolderOpen className="h-5 w-5" />}
+                title={t("app.classroom.noAssignments")}
+                hint={canCreate ? t("app.classroom.noAssignmentsHint") : undefined}
+              />
             )}
           </div>
         )}
@@ -2501,7 +2526,7 @@ const SubmissionsView: React.FC<SubmissionsViewProps> = ({
             </span>
           </div>
           {students.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "48px 16px", fontSize: 12, color: "var(--text-3)" }}>{t("app.submissions.noSubmissions")}</div>
+            <EmptyState icon={<Inbox className="h-5 w-5" />} title={t("app.submissions.noSubmissions")} />
           ) : (
             students.map(stu => {
               const latestSub = stu.subs.reduce((a: any, b: any) => new Date(a.submitted_at) > new Date(b.submitted_at) ? a : b, stu.subs[0]);
@@ -2688,6 +2713,11 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
   const terminalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  // Inputs the student typed at input() prompts during the interactive Run.
+  // Replayed as stdin when submitting so grading sees the same input the
+  // student tested with — otherwise input() programs get an empty stdin and
+  // are wrongly flagged as failed.
+  const collectedInputsRef = useRef<string[]>([]);
   const lineId = useRef(0);
   const runCount = useRef(0);
   const runStartRef = useRef(0);
@@ -2741,6 +2771,8 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
     setLastRunInfo(null);
     setAwaitingInput(false);
     setInputValue("");
+    // Fresh run: start collecting this run's input() lines from scratch.
+    collectedInputsRef.current = [];
     runStartRef.current = Date.now();
 
     let ws: WebSocket;
@@ -2792,6 +2824,8 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
     if (!ws || ws.readyState !== WebSocket.OPEN || !awaitingInput) return;
     ws.send(JSON.stringify({ type: "input_response", value: inputValue }));
     appendLine(inputValue + "\n", "stdout");
+    // Remember this line so it can be replayed as stdin on submit.
+    collectedInputsRef.current.push(inputValue);
     setInputValue("");
     setAwaitingInput(false);
   };
@@ -3021,7 +3055,7 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
                 )}
                 {!isWorkspace && (
                   <button
-                    onClick={() => onSubmit([])}
+                    onClick={() => onSubmit(collectedInputsRef.current)}
                     disabled={loading}
                     className="px-3 py-1.5 text-xs rounded-[10px] border font-medium disabled:opacity-60 transition-colors"
                     style={{
@@ -3261,10 +3295,11 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
                 </ul>
               ) : submissions.length === 0 ? (
                 <div className="flex-1 overflow-auto">
-                  <div className="px-3 py-4 text-center">
-                    <div className="text-[11px]" style={{ color: "var(--subtle)" }}>{t("app.assignment.noSubmissions")}</div>
-                    <div className="text-[10px] mt-1" style={{ color: "var(--border-2)" }}>{t("app.assignment.waitingForStudents")}</div>
-                  </div>
+                  <EmptyState
+                    icon={<Inbox className="h-5 w-5" />}
+                    title={t("app.assignment.noSubmissions")}
+                    hint={t("app.assignment.waitingForStudents")}
+                  />
                 </div>
               ) : (
                 <ul className="flex-1 overflow-auto">

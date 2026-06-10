@@ -188,10 +188,56 @@ code, pre, .font-mono {
   background-color: inherit !important;
   white-space: nowrap !important;
   pointer-events: none !important;
-  transition: opacity 200ms ease-in-out !important;
+  transition: opacity 350ms ease !important;
   z-index: 10 !important;
 }
 
 .cm-ySelectionCaret:hover .cm-ySelectionInfo {
   opacity: 0.35 !important;
+}
+
+/* When a remote user goes idle, hide just their name label (a controller in
+   CodeEditor toggles this class per-user), leaving the thin caret so the name
+   stops covering the code other people are reading. Returns on next movement. */
+.cm-ySelectionCaret--idle > .cm-ySelectionInfo {
+  opacity: 0 !important;
+}
+
+/* ── Sidebar nav items (app shell) ───────────────────────────────────── */
+.sidebar-nav-item[data-active="false"][data-disabled="false"]:hover {
+  background: var(--bg-2) !important;
+  color: var(--text-2) !important;
+}
+/* Accent edge marks the active item — calmer than a full fill. */
+.sidebar-nav-item[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: 0 3px 3px 0;
+  background: var(--indigo);
+}
+.sidebar-icon-btn {
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.sidebar-icon-btn:hover {
+  background: var(--bg-2) !important;
+  color: var(--text) !important;
+  border-color: var(--border-2) !important;
+}
+
+/* ── Global keyboard focus ring ──────────────────────────────────────── */
+/* Landing buttons opt out with `focus-visible:outline-none` + their own ring;
+   everything else gets a consistent, accessible indigo ring. */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--indigo);
+  outline-offset: 2px;
 }

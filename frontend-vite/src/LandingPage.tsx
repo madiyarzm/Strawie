@@ -89,39 +89,52 @@ const TYPING_FULL = `print(f"Welcome to class, {name}!")`;
 // ── Glass nav ───────────────────────────────────────────────────────────
 const Nav: React.FC<{ onSignIn: () => void }> = ({ onSignIn }) => {
   const { t } = useTranslation();
+  // Condense the floating nav once the user scrolls past the hero — a subtle
+  // shrink + firmer shadow, the way refined product sites do it.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 16);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <header className="fixed top-4 inset-x-0 z-50 flex justify-center px-4">
+    <header className={`fixed inset-x-0 z-50 flex justify-center px-4 transition-all duration-300 ease-out ${scrolled ? "top-2" : "top-4"}`}>
       <nav
-        className="flex items-center gap-2 px-3 py-2 rounded-full
-                   bg-white/70 backdrop-blur-xl
-                   border border-white/60
-                   shadow-lift-glass"
+        className={`flex items-center gap-2 rounded-full
+                   bg-white/70 backdrop-blur-xl border border-white/60
+                   transition-all duration-300 ease-out
+                   ${scrolled ? "px-2.5 py-1.5 shadow-lift-md bg-white/80" : "px-3 py-2 shadow-lift-glass"}`}
       >
         <div className="pl-2 pr-3">
-          <StrawieLogoSvg size={26} />
+          <StrawieLogoSvg size={scrolled ? 23 : 26} />
         </div>
         <div className="hidden lg:flex items-center gap-1 text-[13px] text-apple-ink-3 font-medium">
-          <a className="px-3 py-1.5 rounded-full hover:bg-apple-mist transition" href="#editor">{t("landing.nav.editor")}</a>
-          <a className="px-3 py-1.5 rounded-full hover:bg-apple-mist transition" href="#features">{t("landing.nav.features")}</a>
-          <a className="px-3 py-1.5 rounded-full hover:bg-apple-mist transition" href="#teachers">{t("landing.nav.teachers")}</a>
-          <a className="px-3 py-1.5 rounded-full hover:bg-apple-mist transition" href="#students">{t("landing.nav.students")}</a>
+          <a className="px-3 py-1.5 rounded-full hover:bg-apple-mist hover:text-apple-ink transition-colors duration-200" href="#editor">{t("landing.nav.editor")}</a>
+          <a className="px-3 py-1.5 rounded-full hover:bg-apple-mist hover:text-apple-ink transition-colors duration-200" href="#features">{t("landing.nav.features")}</a>
+          <a className="px-3 py-1.5 rounded-full hover:bg-apple-mist hover:text-apple-ink transition-colors duration-200" href="#teachers">{t("landing.nav.teachers")}</a>
+          <a className="px-3 py-1.5 rounded-full hover:bg-apple-mist hover:text-apple-ink transition-colors duration-200" href="#students">{t("landing.nav.students")}</a>
         </div>
         <LanguageSwitcher variant="light" className="shrink-0" />
         <button
           onClick={onSignIn}
-          className="px-3 py-1.5 text-[13px] font-medium text-apple-ink-2 hover:text-apple-ink rounded-full transition"
+          className="px-3 py-1.5 text-[13px] font-medium text-apple-ink-2 hover:text-apple-ink rounded-full transition-colors duration-200
+                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-apple-ink/15"
         >
           {t("landing.nav.signIn")}
         </button>
         <button
           onClick={onSignIn}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-full
+          className="group flex items-center gap-1.5 px-4 py-1.5 rounded-full
                      bg-apple-ink text-white text-[13px] font-semibold
-                     shadow-lift-sm
-                     hover:bg-apple-ink-2 active:scale-[0.98] transition"
+                     shadow-lift-sm hover:shadow-lift-md
+                     hover:bg-apple-ink-2 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]
+                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-apple-ink/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white
+                     transition-all duration-200 ease-out"
         >
           {t("landing.nav.open")}
-          <ArrowRight size={14} strokeWidth={2.5} />
+          <ArrowRight size={14} strokeWidth={2.5} className="transition-transform duration-200 group-hover:translate-x-0.5" />
         </button>
       </nav>
     </header>
@@ -538,8 +551,8 @@ const Hero: React.FC<{ onCta: () => void }> = ({ onCta }) => {
     <section className="relative pt-36 pb-28 px-6 overflow-hidden">
       {/* subtle background wash */}
       <div className="absolute inset-0 -z-10">
-        <div className="absolute top-32 left-1/2 -translate-x-1/2 w-[1100px] h-[600px] bg-berry-blue-soft/60 blur-3xl rounded-full" />
-        <div className="absolute top-64 right-[-10%] w-[500px] h-[500px] bg-berry-purple-soft/70 blur-3xl rounded-full" />
+        <div className="absolute top-32 left-1/2 -translate-x-1/2 w-[1200px] h-[640px] bg-berry-blue-soft/35 blur-[120px] rounded-full" />
+        <div className="absolute top-64 right-[-10%] w-[520px] h-[520px] bg-berry-purple-soft/30 blur-[120px] rounded-full" />
       </div>
 
       <div className="max-w-[1180px] mx-auto">
@@ -548,21 +561,8 @@ const Hero: React.FC<{ onCta: () => void }> = ({ onCta }) => {
           animate="show"
           className="text-center max-w-[820px] mx-auto"
         >
-          <motion.div
-            custom={0}
-            variants={fadeUp}
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full
-                       bg-white/70 backdrop-blur-md border border-apple-line
-                       shadow-lift-sm mb-7"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span className="text-[12px] font-medium text-apple-ink-2">
-              {t("landing.hero.badge")}
-            </span>
-          </motion.div>
-
           <motion.h1
-            custom={1}
+            custom={0}
             variants={fadeUp}
             className="text-[clamp(40px,6vw,76px)] leading-[1.04] tracking-[-0.04em]
                        font-[800] text-apple-ink"
@@ -571,7 +571,7 @@ const Hero: React.FC<{ onCta: () => void }> = ({ onCta }) => {
               i18nKey="landing.hero.title"
               components={{
                 grad: (
-                  <span className="bg-gradient-to-br from-berry-blue via-berry-purple to-berry-coral
+                  <span className="bg-gradient-to-r from-berry-blue to-berry-purple
                                    bg-clip-text text-transparent" />
                 ),
               }}
@@ -579,7 +579,7 @@ const Hero: React.FC<{ onCta: () => void }> = ({ onCta }) => {
           </motion.h1>
 
           <motion.p
-            custom={2}
+            custom={1}
             variants={fadeUp}
             className="mt-7 text-[18px] leading-[1.55] text-apple-ink-3 max-w-[620px] mx-auto"
           >
@@ -587,19 +587,22 @@ const Hero: React.FC<{ onCta: () => void }> = ({ onCta }) => {
           </motion.p>
 
           <motion.div
-            custom={3}
+            custom={2}
             variants={fadeUp}
             className="mt-10 flex items-center justify-center gap-3"
           >
             <button
               onClick={onCta}
-              className="flex items-center gap-2 px-5 py-3 rounded-full
+              className="group flex items-center gap-2 px-5 py-3 rounded-full
                          bg-apple-ink text-white text-[14px] font-semibold
-                         shadow-lift-md
-                         hover:bg-apple-ink-2 active:scale-[0.98] transition"
+                         shadow-lift-md hover:shadow-lift-xl
+                         hover:bg-apple-ink-2 hover:-translate-y-0.5
+                         active:translate-y-0 active:scale-[0.98]
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-apple-ink/25 focus-visible:ring-offset-2 focus-visible:ring-offset-apple-bg
+                         transition-all duration-200 ease-out"
             >
               {t("landing.hero.ctaPrimary")}
-              <ArrowRight size={16} strokeWidth={2.5} />
+              <ArrowRight size={16} strokeWidth={2.5} className="transition-transform duration-200 group-hover:translate-x-0.5" />
             </button>
             <button
               onClick={onCta}
@@ -607,8 +610,11 @@ const Hero: React.FC<{ onCta: () => void }> = ({ onCta }) => {
                          bg-white/70 backdrop-blur-md
                          border border-apple-line
                          text-[14px] font-semibold text-apple-ink-2
-                         shadow-lift-sm
-                         hover:bg-white transition"
+                         shadow-lift-sm hover:shadow-lift-md
+                         hover:bg-white hover:-translate-y-0.5
+                         active:translate-y-0 active:scale-[0.98]
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-apple-ink/15 focus-visible:ring-offset-2 focus-visible:ring-offset-apple-bg
+                         transition-all duration-200 ease-out"
             >
               {t("landing.hero.ctaSecondary")}
             </button>
@@ -1180,12 +1186,15 @@ const Roles: React.FC<{ onCta: () => void }> = ({ onCta }) => {
               <div className="mt-7">
                 <button
                   onClick={onCta}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full
+                  className={`group w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full
                               bg-apple-ink text-white text-[13px] font-semibold
-                              shadow-lift-sm hover:bg-apple-ink-2 transition`}
+                              shadow-lift-sm hover:shadow-lift-md hover:bg-apple-ink-2
+                              hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]
+                              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-apple-ink/25 focus-visible:ring-offset-2 focus-visible:ring-offset-apple-surface
+                              transition-all duration-200 ease-out`}
                 >
                   {r.openLabel}
-                  <ArrowRight size={14} strokeWidth={2.5} />
+                  <ArrowRight size={14} strokeWidth={2.5} className="transition-transform duration-200 group-hover:translate-x-0.5" />
                 </button>
               </div>
             </motion.div>
@@ -1244,12 +1253,15 @@ const CTA: React.FC<{ onCta: () => void }> = ({ onCta }) => {
           >
             <button
               onClick={onCta}
-              className="flex items-center gap-2 px-6 py-3 rounded-full
+              className="group flex items-center gap-2 px-6 py-3 rounded-full
                          bg-apple-ink text-white text-[14px] font-semibold
-                         shadow-lift-md hover:bg-apple-ink-2 active:scale-[0.98] transition"
+                         shadow-lift-md hover:shadow-lift-xl hover:bg-apple-ink-2
+                         hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-apple-ink/25 focus-visible:ring-offset-2 focus-visible:ring-offset-apple-surface
+                         transition-all duration-200 ease-out"
             >
               {t("landing.cta.button")}
-              <ArrowRight size={16} strokeWidth={2.5} />
+              <ArrowRight size={16} strokeWidth={2.5} className="transition-transform duration-200 group-hover:translate-x-0.5" />
             </button>
           </motion.div>
         </div>
@@ -1322,6 +1334,9 @@ export const LandingPage: React.FC = () => {
   const [showBrowserModal, setShowBrowserModal] = useState(false);
 
   useEffect(() => {
+    // `?preview` keeps us on the marketing page even when logged in — so the
+    // landing can be reviewed without logging out. Real visitors never use it.
+    if (new URLSearchParams(window.location.search).has("preview")) return;
     // Cookie auth: probe /me to learn if we're logged in. 401 = not logged in,
     // stay on the landing page.
     getMe()

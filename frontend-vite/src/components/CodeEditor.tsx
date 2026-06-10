@@ -167,6 +167,58 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     viewRef.current.dispatch({ effects: [setErrorLinesEffect.of(errorLines ?? [])] });
   }, [errorLines]);
 
+  // Fade a remote user's name label once they stop moving, leaving just the
+  // thin caret so parked names don't cover the code others are reading (the
+  // hide is CSS via `.cm-ySelectionCaret--idle`). y-codemirror keys each caret
+  // by color and reuses the DOM node across moves, so we toggle the class
+  // per-user, matching the caret by its inline color (== awareness user.color).
+  useEffect(() => {
+    if (!awareness) return;
+    const IDLE_MS = 3500;
+    const timers = new Map<string, ReturnType<typeof setTimeout>>();
+    // Canonicalize any CSS color to the browser's "rgb(...)" form for matching.
+    const probe = document.createElement("span");
+    const norm = (c: string): string => {
+      probe.style.color = "";
+      probe.style.color = c;
+      return probe.style.color;
+    };
+
+    const markActive = (color: string) => {
+      const root = viewRef.current?.dom;
+      if (!root) return;
+      const want = norm(color);
+      root.querySelectorAll<HTMLElement>(".cm-ySelectionCaret").forEach((el) => {
+        if (norm(el.style.backgroundColor) !== want) return;
+        el.classList.remove("cm-ySelectionCaret--idle");
+        const prev = timers.get(want);
+        if (prev) clearTimeout(prev);
+        timers.set(want, setTimeout(() => el.classList.add("cm-ySelectionCaret--idle"), IDLE_MS));
+      });
+    };
+
+    const onChange = ({ added, updated }: { added: number[]; updated: number[]; removed: number[] }) => {
+      const self = awareness.doc.clientID;
+      const ids = added.concat(updated).filter((id) => id !== self);
+      if (ids.length === 0) return;
+      const states = awareness.getStates();
+      // Defer a frame so y-codemirror has (re)rendered the caret for this change.
+      requestAnimationFrame(() => {
+        for (const id of ids) {
+          const color = (states.get(id)?.user as { color?: string } | undefined)?.color;
+          if (color) markActive(color);
+        }
+      });
+    };
+
+    awareness.on("change", onChange);
+    return () => {
+      awareness.off("change", onChange);
+      timers.forEach((tm) => clearTimeout(tm));
+      timers.clear();
+    };
+  }, [awareness]);
+
   const onChangeRef = useRef(onChange);
   useEffect(() => {
     onChangeRef.current = onChange;
