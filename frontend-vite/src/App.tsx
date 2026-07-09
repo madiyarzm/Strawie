@@ -5,6 +5,7 @@ import { MentorApp } from "./MentorApp";
 import { DrawingPage } from "./DrawingPage";
 import { AuthCallback } from "./AuthCallback";
 import { RolePickPage } from "./RolePickPage";
+import { Footer } from "./components/Footer";
 
 export const App: React.FC = () => (
   <BrowserRouter>
@@ -15,6 +16,7 @@ export const App: React.FC = () => (
       <Route path="/app" element={<MentorApp />} />
       <Route path="/draw/:roomId" element={<DrawingPage />} />
     </Routes>
+    <Footer />
   </BrowserRouter>
 );
 
