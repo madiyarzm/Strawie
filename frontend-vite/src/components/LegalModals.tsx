@@ -1,74 +1,28 @@
-import React, { useState } from "react";
+import React from "react";
 import { X } from "lucide-react";
 
-export const Footer: React.FC = () => {
-  const [showTerms, setShowTerms] = useState(false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
-
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const element = e.currentTarget;
-    element.scrollTop = element.scrollHeight;
-  };
-
+export const TermsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   return (
-    <>
-      {/* Footer */}
-      <footer
-        className="border-t mt-16"
+    <div
+      className="fixed inset-0 flex items-end z-50"
+      style={{
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backdropFilter: "blur(4px)",
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-h-[80vh] overflow-y-auto"
         style={{
+          backgroundColor: "var(--bg)",
+          borderRadius: "20px 20px 0 0",
+          borderTop: "1px solid",
           borderColor: "var(--border)",
-          backgroundColor: "var(--bg-2)",
-          padding: "24px 16px",
+          padding: "32px 24px",
         }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-center md:justify-between gap-6"
-          style={{ color: "var(--text-2)" }}
-        >
-          <div className="text-sm">
-            © 2026 Strawie. Built by Madiyar Zhunussov.
-          </div>
-          <div className="flex gap-6 text-sm">
-            <button
-              onClick={() => setShowTerms(true)}
-              className="hover:opacity-80 transition-opacity"
-              style={{ color: "var(--indigo)" }}
-            >
-              Terms of Service
-            </button>
-            <div style={{ color: "var(--border)" }}>•</div>
-            <button
-              onClick={() => setShowPrivacy(true)}
-              className="hover:opacity-80 transition-opacity"
-              style={{ color: "var(--indigo)" }}
-            >
-              Privacy Policy
-            </button>
-          </div>
-        </div>
-      </footer>
-
-      {/* Terms Modal */}
-      {showTerms && (
-        <div
-          className="fixed inset-0 flex items-end z-50"
-          style={{
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            backdropFilter: "blur(4px)",
-          }}
-        >
-          <div
-            className="w-full max-h-[80vh] overflow-y-auto"
-            style={{
-              backgroundColor: "var(--bg)",
-              borderRadius: "20px 20px 0 0",
-              borderTop: "1px solid",
-              borderColor: "var(--border)",
-              padding: "32px 24px",
-            }}
-            onScroll={handleScroll}
-          >
-            <div className="max-w-2xl">
+            <div className="max-w-2xl mx-auto">
               <div className="flex items-center justify-between mb-6">
                 <h2
                   className="text-2xl font-bold"
@@ -77,7 +31,7 @@ export const Footer: React.FC = () => {
                   Terms of Service
                 </h2>
                 <button
-                  onClick={() => setShowTerms(false)}
+                  onClick={onClose}
                   className="p-2 hover:bg-opacity-80 rounded-lg transition-colors"
                   style={{ backgroundColor: "var(--bg-3)" }}
                 >
@@ -86,7 +40,7 @@ export const Footer: React.FC = () => {
               </div>
 
               <div
-                className="prose prose-invert max-w-none text-sm space-y-4"
+                className="prose max-w-none text-sm space-y-4"
                 style={{ color: "var(--text-2)" }}
               >
                 <p>
@@ -244,31 +198,33 @@ export const Footer: React.FC = () => {
                 </p>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+      </div>
+    </div>
+  );
+};
 
-      {/* Privacy Modal */}
-      {showPrivacy && (
-        <div
-          className="fixed inset-0 flex items-end z-50"
-          style={{
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            backdropFilter: "blur(4px)",
-          }}
-        >
-          <div
-            className="w-full max-h-[80vh] overflow-y-auto"
-            style={{
-              backgroundColor: "var(--bg)",
-              borderRadius: "20px 20px 0 0",
-              borderTop: "1px solid",
-              borderColor: "var(--border)",
-              padding: "32px 24px",
-            }}
-            onScroll={handleScroll}
-          >
-            <div className="max-w-2xl">
+export const PrivacyModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  return (
+    <div
+      className="fixed inset-0 flex items-end z-50"
+      style={{
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backdropFilter: "blur(4px)",
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-h-[80vh] overflow-y-auto"
+        style={{
+          backgroundColor: "var(--bg)",
+          borderRadius: "20px 20px 0 0",
+          borderTop: "1px solid",
+          borderColor: "var(--border)",
+          padding: "32px 24px",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+            <div className="max-w-2xl mx-auto">
               <div className="flex items-center justify-between mb-6">
                 <h2
                   className="text-2xl font-bold"
@@ -277,7 +233,7 @@ export const Footer: React.FC = () => {
                   Privacy Policy
                 </h2>
                 <button
-                  onClick={() => setShowPrivacy(false)}
+                  onClick={onClose}
                   className="p-2 hover:bg-opacity-80 rounded-lg transition-colors"
                   style={{ backgroundColor: "var(--bg-3)" }}
                 >
@@ -286,7 +242,7 @@ export const Footer: React.FC = () => {
               </div>
 
               <div
-                className="prose prose-invert max-w-none text-sm space-y-4"
+                className="prose max-w-none text-sm space-y-4"
                 style={{ color: "var(--text-2)" }}
               >
                 <p>
@@ -447,9 +403,7 @@ export const Footer: React.FC = () => {
                 </p>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 };

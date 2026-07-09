@@ -21,6 +21,7 @@ import {
 import { getMe, googleLogin, isInAppBrowser } from "./lib/api";
 import { StrawieLogoSvg } from "./components/Logo";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
+import { TermsModal, PrivacyModal } from "./components/LegalModals";
 
 import strawieTeaching from "./assets/mascots/characters/strawie-teaching.png";
 import berryFocused from "./assets/mascots/characters/berry-focused.png";
@@ -1274,13 +1275,35 @@ const CTA: React.FC<{ onCta: () => void }> = ({ onCta }) => {
 // ── Footer ─────────────────────────────────────────────────────────────
 const Footer: React.FC = () => {
   const { t } = useTranslation();
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   return (
-  <footer className="px-6 py-10 border-t border-apple-line bg-white">
-    <div className="max-w-[1180px] mx-auto flex items-center justify-between">
-      <StrawieLogoSvg size={24} />
-      <div className="text-[12px] text-apple-ink-4">{t("landing.footer.copyright")}</div>
-    </div>
-  </footer>
+    <>
+      <footer className="px-6 py-10 border-t border-apple-line bg-white">
+        <div className="max-w-[1180px] mx-auto flex items-center justify-between">
+          <StrawieLogoSvg size={24} />
+          <div className="flex items-center gap-4 text-[12px] text-apple-ink-4">
+            <button
+              onClick={() => setShowTerms(true)}
+              className="hover:text-apple-ink transition-colors"
+            >
+              Terms of Service
+            </button>
+            <span>·</span>
+            <button
+              onClick={() => setShowPrivacy(true)}
+              className="hover:text-apple-ink transition-colors"
+            >
+              Privacy Policy
+            </button>
+            <span>·</span>
+            <span>{t("landing.footer.copyright")}</span>
+          </div>
+        </div>
+      </footer>
+      {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
+      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
+    </>
   );
 };
 
