@@ -100,7 +100,6 @@ alembic/versions/      database migrations
 ```
 
 ---
-
 ## Getting started
 
 **Prerequisites:** Python 3.12, Node 20+, PostgreSQL.
