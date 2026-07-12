@@ -953,7 +953,19 @@ export const MentorApp: React.FC = () => {
         </div>
 
         {/* Nav items */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, overflow: "hidden" }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            overflowX: "hidden",
+            paddingRight: 2,
+            scrollbarGutter: "stable",
+          }}
+        >
           {navItems.map(item => {
             const isActive = view === item.id;
             const isDisabled = (item.id === "classroom" && !currentClassroom) ||
