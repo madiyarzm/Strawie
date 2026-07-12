@@ -66,7 +66,7 @@ const LESSON_LINES: Line[] = [
   [
     { t: "name", c: PY.ink },
     { t: " = ", c: PY.punct },
-    { t: '"Aigerim"', c: PY.string },
+    { t: '"Berry"', c: PY.string },
   ],
   [
     { t: "xp", c: PY.ink },
@@ -220,7 +220,7 @@ const EditorCard: React.FC<{ className?: string }> = ({ className = "" }) => {
                     </span>
                   ))
                 )}
-                {/* teacher cursor on line 2 (name = "Aigerim") */}
+                {/* teacher cursor on line 2 (name = "Berry") */}
                 {li === 1 && (
                   <CollabCursor color="#5B7FFF" label="Strawie" offsetCh={0} />
                 )}
@@ -228,8 +228,8 @@ const EditorCard: React.FC<{ className?: string }> = ({ className = "" }) => {
                 {li === TYPING_LINE_INDEX && (
                   <CollabCursor
                     color="#9B7BFF"
-                    label="Aigerim"
-                    offsetCh={Math.min(typed, TYPING_FULL.length)}
+                    label="Berry"
+                    offsetCh={0}
                   />
                 )}
               </div>
@@ -241,7 +241,7 @@ const EditorCard: React.FC<{ className?: string }> = ({ className = "" }) => {
         <div className="flex items-center gap-3 px-5 h-11 border-t border-apple-line bg-apple-mist/40">
           <CheckCircle2 size={14} className="text-emerald-500" />
           <span className="text-[12px] font-medium text-apple-ink-2 font-mono">
-            Welcome to class, Aigerim!
+            Welcome to class, Berry!
           </span>
           <span className="ml-auto text-[11px] font-semibold text-berry-blue
                            bg-berry-blue-soft px-2 py-0.5 rounded-full">
@@ -904,7 +904,7 @@ const Bento: React.FC = () => {
           </h3>
           <div className="rounded-xl bg-apple-ink p-3 font-mono text-[11px]">
             <div className="text-emerald-400">$ python lesson_1.py</div>
-            <div className="text-zinc-300 mt-1">Welcome to class, Aigerim!</div>
+            <div className="text-zinc-300 mt-1">Welcome to class, Berry!</div>
             <div className="text-zinc-500 mt-1">— exit code 0 in 0.04s</div>
           </div>
         </BentoTile>
