@@ -25,6 +25,7 @@ from fastapi import APIRouter, WebSocket
 from jose import JWTError
 
 from app.config import get_settings
+from app.core.demo_auth import is_guest_payload
 from app.core.security import decode_access_token
 from app.core.ws_rate_limit import allow as ws_allow
 from app.dependencies import AUTH_COOKIE_NAME
@@ -109,6 +110,18 @@ async def sandbox_run_ws(websocket: WebSocket) -> None:
         return
     except Exception:
         await websocket.close(code=4500, reason="Internal error")
+        return
+
+    # Demo guests must never reach server-side execution. In production
+    # SANDBOX_USE_DOCKER is false, so this endpoint runs user code as a
+    # restricted subprocess inside the application container -- acceptable for
+    # authenticated students, not for an anonymous public endpoint. The demo
+    # runs Python entirely in the visitor's browser via Pyodide instead.
+    if is_guest_payload(payload):
+        await websocket.close(
+            code=4403,
+            reason="Demo mode runs Python in your browser, not on the server.",
+        )
         return
 
     rate_id = payload.get("sub") or (websocket.client.host if websocket.client else "anon")

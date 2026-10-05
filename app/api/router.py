@@ -6,7 +6,7 @@ Mount v1 routes at /api/v1 so we can add v2 later without breaking clients.
 
 from fastapi import APIRouter
 
-from app.api.v1 import admin, auth, users, groups, classrooms, assignments, submissions, sandbox
+from app.api.v1 import admin, auth, users, groups, classrooms, assignments, submissions, sandbox, demo
 
 api_router = APIRouter()
 
@@ -19,5 +19,7 @@ v1_router.include_router(assignments.router, prefix="/assignments", tags=["assig
 v1_router.include_router(submissions.router, prefix="/submissions", tags=["submissions"])
 v1_router.include_router(sandbox.router, prefix="/sandbox", tags=["sandbox"])
 v1_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+# Public, unauthenticated. See app/api/v1/demo.py for the abuse controls.
+v1_router.include_router(demo.router, prefix="/demo", tags=["demo"])
 
 api_router.include_router(v1_router)

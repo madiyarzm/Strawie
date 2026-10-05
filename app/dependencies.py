@@ -14,6 +14,7 @@ from jose import JWTError
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
+from app.core.demo_auth import is_guest_payload
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.user import User
@@ -69,6 +70,22 @@ def get_current_user(
 
     try:
         payload = decode_access_token(token, settings=settings)
+        # Demo guest tokens are signed with the same key but must never
+        # satisfy a real-user dependency. Reject them here, before the
+        # `users` lookup, so every route that depends on CurrentUser --
+        # including /admin, classrooms, groups and submissions -- is
+        # closed to guests by construction rather than route by route.
+        # Without this the guest `sub` ("guest:<uuid>") would reach
+        # db.get(User, ...) and raise a database error instead of a clean
+        # authorisation failure.
+        if is_guest_payload(payload):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "You're in demo mode. Account features are disabled here - "
+                    "sign in to use your own classrooms."
+                ),
+            )
         user_id: str | None = payload.get("sub")  # type: ignore[assignment]
         if user_id is None:
             raise credentials_exception

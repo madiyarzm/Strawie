@@ -5,6 +5,7 @@ import { MentorApp } from "./MentorApp";
 import { DrawingPage } from "./DrawingPage";
 import { AuthCallback } from "./AuthCallback";
 import { RolePickPage } from "./RolePickPage";
+import { DemoLauncher, DemoRoomView } from "./DemoPage";
 
 export const App: React.FC = () => (
   <BrowserRouter>
@@ -14,6 +15,9 @@ export const App: React.FC = () => (
       <Route path="/welcome/role" element={<RolePickPage />} />
       <Route path="/app" element={<MentorApp />} />
       <Route path="/draw/:roomId" element={<DrawingPage />} />
+      {/* Public demo, no account. /demo mints a room then redirects to it. */}
+      <Route path="/demo" element={<DemoLauncher />} />
+      <Route path="/demo/:roomId" element={<DemoRoomView />} />
     </Routes>
   </BrowserRouter>
 );

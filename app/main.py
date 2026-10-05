@@ -28,6 +28,7 @@ from app.core.security_middleware import (
 from app.core.startup_guards import validate_production_settings
 from app.db.init_db import init_db
 from app.db.session import SessionLocal
+from app.services.demo_service import delete_expired_rooms
 from app.services.submission_service import delete_expired_submissions
 
 # 1 MB is enough for code submissions, JSON payloads, and config.
@@ -60,6 +61,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             delete_expired_submissions(db, retention_days=settings.submission_retention_days)
         except Exception as exc:
             logger.error("delete_expired_submissions failed: %s", exc)
+        # Sweep demo rooms in its own try/except: a failure here must not stop
+        # the submission cleanup above, and neither must stop startup.
+        try:
+            delete_expired_rooms(db)
+        except Exception as exc:
+            logger.error("delete_expired_rooms failed: %s", exc)
         finally:
             db.close()
 
