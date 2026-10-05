@@ -24,6 +24,7 @@
       "features": "Features",
       "teachers": "Teachers",
       "students": "Students",
+      "demo": "Try demo",
       "signIn": "Sign in",
       "open": "Open Strawie"
     },
@@ -32,7 +33,8 @@
       "title": "Teach Python the way <grad>you'd teach it</grad> in person.",
       "subtitle": "Strawie is a browser-based Python editor where teachers and students work in the same file, live. No installs, no setup.",
       "ctaPrimary": "Start a classroom",
-      "ctaSecondary": "Join with a code"
+      "ctaSecondary": "Join with a code",
+      "ctaDemo": "Try the demo - no signup"
     },
     "showcase": {
       "eyebrow": "Live collaboration",

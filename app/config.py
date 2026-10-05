@@ -70,6 +70,29 @@ class Settings(BaseSettings):
         description="Docker image for sandbox (e.g. built from docker/sandbox.Dockerfile).",
     )
 
+    # Public demo rooms ("Try demo" — no signup). Guests are a restricted role
+    # enforced in app/dependencies.py and app/core/ws_acl.py.
+    demo_enabled: bool = Field(
+        default=True,
+        description="Expose the public /api/v1/demo endpoints. Set False to kill the demo instantly.",
+    )
+    demo_room_ttl_hours: int = Field(
+        default=3,
+        ge=1,
+        le=24,
+        description="How long a demo room (and its guest token) stays valid before lazy/sweep expiry.",
+    )
+    demo_rooms_per_hour_per_ip: int = Field(
+        default=5,
+        ge=1,
+        description="Max demo rooms one IP may create per hour. A real reviewer needs 1-2.",
+    )
+    demo_rooms_per_day_per_ip: int = Field(
+        default=20,
+        ge=1,
+        description="Daily ceiling per IP, so a slow drip cannot fill the table.",
+    )
+
     # Submissions: keep only for this many days; older ones are hidden and deleted on cleanup.
     # A classroom needs long-lived history (gradebooks, late review), so default to ~1 year.
     submission_retention_days: int = Field(

@@ -24,7 +24,7 @@ import * as Y from "yjs";
 import { yCollab } from "y-codemirror.next";
 import { LifeBuoy } from "lucide-react";
 import { useCollab } from "../hooks/useCollab";
-import type { PeerInfo } from "../hooks/useCollab";
+import type { CollabStatus, PeerInfo } from "../hooks/useCollab";
 
 interface CodeEditorProps {
   value: string;
@@ -36,6 +36,12 @@ interface CodeEditorProps {
   handRaised?: boolean;
   onPeersChange?: (peers: PeerInfo[]) => void;
   errorLines?: number[];
+  /**
+   * Notified when the collaboration relay connects or drops. Optional: only
+   * the demo currently surfaces it, so a visitor sees "live sync offline,
+   * your edits are still saved locally" instead of silence.
+   */
+  onCollabStatusChange?: (status: CollabStatus) => void;
 }
 
 const setErrorLinesEffect = StateEffect.define<number[]>();
@@ -148,17 +154,24 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   handRaised,
   onPeersChange,
   errorLines,
+  onCollabStatusChange,
 }) => {
   const { t } = useTranslation();
   const [ydoc] = useState<Y.Doc>(() => new Y.Doc());
   const viewRef = useRef<EditorView | null>(null);
   const ytext = useMemo(() => ydoc.getText("code"), [ydoc]);
 
-  const { awareness, peers, setHandRaised } = useCollab(roomId, ydoc, value, userName, userRole);
+  const { awareness, peers, setHandRaised, status: collabStatus } = useCollab(roomId, ydoc, value, userName, userRole);
 
   const onPeersChangeRef = useRef(onPeersChange);
   useEffect(() => { onPeersChangeRef.current = onPeersChange; }, [onPeersChange]);
   useEffect(() => { onPeersChangeRef.current?.(peers); }, [peers]);
+
+  // Same ref pattern as onPeersChange: held in a ref so an inline arrow
+  // function from the parent doesn't re-fire the effect every render.
+  const onCollabStatusChangeRef = useRef(onCollabStatusChange);
+  useEffect(() => { onCollabStatusChangeRef.current = onCollabStatusChange; }, [onCollabStatusChange]);
+  useEffect(() => { onCollabStatusChangeRef.current?.(collabStatus); }, [collabStatus]);
 
   useEffect(() => { setHandRaised(!!handRaised); }, [handRaised, setHandRaised]);
 

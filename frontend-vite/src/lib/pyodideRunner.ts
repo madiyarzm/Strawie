@@ -124,6 +124,20 @@ type RunOpts = {
   onOutput?: (e: RunOutput) => void;
   /** Hard wall-clock timeout in ms. Default 10s. */
   timeoutMs?: number;
+  /**
+   * Called when the program hits `input()` and the pre-supplied `stdinLines`
+   * queue is empty. Must return the line SYNCHRONOUSLY, because CPython's
+   * `input()` is a blocking call and Pyodide runs on the main thread -- there
+   * is no point at which we could await a promise and resume the interpreter.
+   *
+   * A synchronous `window.prompt()` is the one browser API that satisfies
+   * this. Returning null means "no more input", which Python sees as EOF.
+   *
+   * (The alternative -- Pyodide in a worker with SharedArrayBuffer and
+   * Atomics.wait -- gives in-page input but needs cross-origin isolation,
+   * which conflicts with loading Pyodide from the CDN.)
+   */
+  onStdinRequest?: (promptText: string) => string | null;
 };
 
 async function runWithIO(opts: RunOpts): Promise<RunResult> {
@@ -134,8 +148,17 @@ async function runWithIO(opts: RunOpts): Promise<RunResult> {
   const stderrBuf: string[] = [];
   const queue = [...(opts.stdinLines ?? [])];
 
+  // Pyodide writes the `input()` prompt to stdout just before reading stdin,
+  // so the most recent stdout chunk is our best guess at the prompt text.
+  // Declared before setStdout because that callback closes over it.
+  // Note: `batched` only flushes on a newline, and a prompt like
+  // "Name? " has none -- so this can legitimately still be empty when
+  // stdin is read. Callers must cope with an empty promptText.
+  let lastStdoutChunk = "";
+
   py.setStdout({
     batched: (s: string) => {
+      lastStdoutChunk = s;
       stdoutBuf.push(s + "\n");
       opts.onOutput?.({ type: "stdout", text: s + "\n" });
     },
@@ -147,11 +170,39 @@ async function runWithIO(opts: RunOpts): Promise<RunResult> {
     },
   });
   py.setStdin({
-    stdin: () => {
-      if (queue.length === 0) return "";
-      return queue.shift() as string;
+    stdin: (): string | null => {
+      // One call of this callback must supply exactly one line.
+      //
+      // This relies on `autoEOF: true` below. With autoEOF disabled, Pyodide
+      // keeps calling back until its 2048-byte buffer fills -- a newline does
+      // NOT end the read -- so an interactive handler would open 2048 prompts
+      // for a single `input()`. autoEOF inserts the EOF that terminates each
+      // read, so one callback return answers one `input()`.
+      //
+      // Returning "" means end of input.
+      if (queue.length > 0) {
+        return queue.shift() as string;
+      }
+
+      // No queued input and no interactive handler: signal EOF rather than
+      // hanging, which is what callers passing a finite stdinLines expect.
+      if (!opts.onStdinRequest) {
+        return "";
+      }
+
+      const answer = opts.onStdinRequest(lastStdoutChunk.trim());
+      // The user cancelled the prompt. Returning null is EOF, so `input()`
+      // raises EOFError and the program ends instead of prompting forever.
+      if (answer === null) {
+        return null;
+      }
+      // Echo the typed line into the transcript, otherwise the output reads
+      // as if the prompt answered itself.
+      opts.onOutput?.({ type: "stdout", text: answer + "\n" });
+      return answer;
     },
-    autoEOF: false,
+    // See the note above: this must stay true or interactive input loops.
+    autoEOF: true,
   });
 
   // Watchdog: Pyodide on main thread can't be killed mid-execution, but we

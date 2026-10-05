@@ -14,6 +14,16 @@ export type PeerInfo = {
   handRaised?: boolean;
 };
 
+/**
+ * Connection state of the collaboration relay.
+ *
+ * Exposed so a caller can tell the user that live sync is down while local
+ * editing keeps working -- otherwise an unreachable relay looks like a bug.
+ * "reconnecting" covers the backoff window below, which is also the initial
+ * state after a failed first connect.
+ */
+export type CollabStatus = "connecting" | "connected" | "reconnecting";
+
 const TEACHER_COLOR = "#22c55e"; // green-500
 
 const STUDENT_COLORS = [
@@ -47,8 +57,14 @@ export function useCollab(
   initialValue?: string,
   userName?: string,
   userRole?: string,
-): { awareness: Awareness | null; peers: PeerInfo[]; setHandRaised: (raised: boolean) => void } {
+): {
+  awareness: Awareness | null;
+  peers: PeerInfo[];
+  setHandRaised: (raised: boolean) => void;
+  status: CollabStatus;
+} {
   const [awareness, setAwareness] = useState<Awareness | null>(null);
+  const [status, setStatus] = useState<CollabStatus>("connecting");
   const [peers, setPeers] = useState<PeerInfo[]>([]);
   const awarenessRef = useRef<Awareness | null>(null);
 
@@ -210,6 +226,7 @@ export function useCollab(
     // so peers silently stop seeing each other's updates.
     const scheduleReconnect = () => {
       if (disposed || reconnectTimer) return;
+      setStatus("reconnecting");
       if (heartbeatInterval) {
         clearInterval(heartbeatInterval);
         heartbeatInterval = null;
@@ -224,6 +241,7 @@ export function useCollab(
 
     const onOpen = () => {
       reconnectAttempts = 0;
+      setStatus("connected");
       // (Re)sync: push our full doc + awareness state. On a reconnect this
       // replays any edits made while disconnected (Yjs/CRDT merges cleanly),
       // and prompts peers to re-send their state when they see us reappear.
@@ -315,5 +333,5 @@ export function useCollab(
     aw.setLocalStateField("handRaised", raised);
   };
 
-  return { awareness, peers, setHandRaised };
+  return { awareness, peers, setHandRaised, status };
 }
