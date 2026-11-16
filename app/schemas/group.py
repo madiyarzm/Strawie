@@ -7,12 +7,22 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.schemas.lesson import GroupSchedule
+
 
 class GroupCreate(BaseModel):
     """Payload for creating a new group."""
 
     name: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=2000)
+    schedule: GroupSchedule | None = None
+
+
+class GroupUpdate(BaseModel):
+    """Rename a group or change its weekly schedule (owner only)."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    schedule: GroupSchedule | None = None
 
 
 class GroupRead(BaseModel):
@@ -23,6 +33,7 @@ class GroupRead(BaseModel):
     name: str
     description: str | None = None
     invite_code: str | None = None
+    schedule: dict | None = None
     member_count: int = 0
     created_at: datetime
     updated_at: datetime

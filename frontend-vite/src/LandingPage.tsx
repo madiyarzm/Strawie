@@ -118,6 +118,15 @@ const Nav: React.FC<{ onSignIn: () => void }> = ({ onSignIn }) => {
           <a className="px-3 py-1.5 rounded-full hover:bg-apple-mist hover:text-apple-ink transition-colors duration-200" href="#students">{t("landing.nav.students")}</a>
         </div>
         <LanguageSwitcher variant="light" className="shrink-0" />
+        {/* Public demo: no account needed. Plain <a> so it works regardless of
+            router state, and so it can be shared as a bare link. */}
+        <a
+          href="/demo"
+          className="px-3 py-1.5 text-[13px] font-semibold text-apple-ink-2 hover:text-apple-ink rounded-full transition-colors duration-200
+                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-apple-ink/15"
+        >
+          {t("landing.nav.demo")}
+        </a>
         <button
           onClick={onSignIn}
           className="px-3 py-1.5 text-[13px] font-medium text-apple-ink-2 hover:text-apple-ink rounded-full transition-colors duration-200
@@ -229,7 +238,7 @@ const EditorCard: React.FC<{ className?: string }> = ({ className = "" }) => {
                   <CollabCursor
                     color="#9B7BFF"
                     label="Berry"
-                    offsetCh={0}
+                    offsetCh={Math.min(typed, TYPING_FULL.length)}
                   />
                 )}
               </div>
@@ -619,6 +628,17 @@ const Hero: React.FC<{ onCta: () => void }> = ({ onCta }) => {
             >
               {t("landing.hero.ctaSecondary")}
             </button>
+            <a
+              href="/demo"
+              className="px-5 py-3 rounded-full
+                         text-[14px] font-semibold text-apple-ink-3
+                         hover:text-apple-ink underline decoration-apple-line
+                         decoration-2 underline-offset-4 hover:decoration-apple-ink/40
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-apple-ink/15 focus-visible:ring-offset-2 focus-visible:ring-offset-apple-bg
+                         transition-all duration-200 ease-out"
+            >
+              {t("landing.hero.ctaDemo")}
+            </a>
           </motion.div>
         </motion.div>
 

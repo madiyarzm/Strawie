@@ -40,41 +40,35 @@ export const SimpleInputModal: React.FC<SimpleInputModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-xl shadow-2xl">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800">
-          <h2 className="text-sm font-semibold text-slate-100">{title}</h2>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="text-slate-500 hover:text-slate-300 transition-colors"
-          >
+    <div
+      className="st-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div
+        className="st-pop-in w-full max-w-sm rounded-[22px]"
+        style={{ background: "var(--bg)", border: "1px solid var(--border)", boxShadow: "var(--shadow-lg)" }}
+      >
+        <div className="flex items-center justify-between px-5 pt-5 pb-2">
+          <h2 className="text-[16px] font-semibold" style={{ color: "var(--text)", letterSpacing: "-0.01em" }}>{title}</h2>
+          <button type="button" onClick={onCancel} className="st-icon-btn" aria-label={t("common.close")}>
             <X className="h-4 w-4" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
+        <form onSubmit={handleSubmit} className="px-5 pb-5 pt-2 space-y-4">
           <input
             ref={inputRef}
             type="text"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={placeholder}
-            className="w-full rounded-md bg-slate-950 border border-slate-800 px-3 py-1.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-sky-500/60"
+            className="st-input w-full rounded-[12px] px-3.5 py-2.5 text-sm placeholder:opacity-50"
             required
           />
           <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-3 py-1.5 text-xs border border-slate-700 rounded-md bg-transparent text-slate-300 hover:bg-slate-800 transition-colors"
-            >
+            <button type="button" onClick={onCancel} className="st-btn st-btn-ghost">
               {t("common.cancel")}
             </button>
-            <button
-              type="submit"
-              disabled={!value.trim()}
-              className="px-4 py-1.5 text-xs rounded-md font-medium bg-sky-500 text-slate-950 hover:bg-sky-400 disabled:opacity-50 transition-colors"
-            >
+            <button type="submit" disabled={!value.trim()} className="st-btn st-btn-primary">
               {confirmLabel ?? t("common.save")}
             </button>
           </div>

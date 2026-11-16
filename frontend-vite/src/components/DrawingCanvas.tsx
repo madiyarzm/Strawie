@@ -1,10 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pencil, Eraser, Trash2, Maximize2, ZoomIn, ZoomOut } from "lucide-react";
+import { Pencil, Eraser, Trash2, Maximize2, ZoomIn, ZoomOut, Type, Square, Circle, Minus, ArrowUpRight } from "lucide-react";
 import { useCollabDrawing } from "../hooks/useCollabDrawing";
-import type { DrawingStroke, PeerCursor } from "../hooks/useCollabDrawing";
+import type { DrawingStroke, DrawingTool, PeerCursor } from "../hooks/useCollabDrawing";
 
-type Tool = "pen" | "eraser";
+type Tool = DrawingTool;
+const SHAPES: Tool[] = ["rect", "ellipse", "line", "arrow"];
+const MAX_TEXT = 500;
+const textSize = (width: number) => 12 + width * 3;
+const TEXT_FONT = (size: number) => `600 ${size}px "Plus Jakarta Sans", system-ui, -apple-system, sans-serif`;
 
 const COLORS = [
   { value: "#e2e8f0", labelKey: "drawing.colorWhite" },
@@ -22,7 +26,26 @@ const WIDTHS = [
   { value: 12, labelKey: "drawing.sizeThick" },
 ];
 
-const CANVAS_BG = "#020617"; // slate-950
+// Stroke colours are stored as these fixed hex values (shared over Yjs, so
+// they must stay stable across clients). They were picked for a dark board;
+// on the light board we draw them with deeper equivalents, and the default
+// "chalk white" becomes ink. Peers on different themes see the same drawing.
+const LIGHT_DISPLAY: Record<string, string> = {
+  "#e2e8f0": "#1F2937",
+  "#38bdf8": "#0284C7",
+  "#a78bfa": "#7C3AED",
+  "#34d399": "#059669",
+  "#fbbf24": "#D97706",
+  "#fb7185": "#E11D48",
+  "#fb923c": "#EA580C",
+};
+
+const isDarkTheme = () =>
+  typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "dark";
+
+function displayColor(stored: string): string {
+  return isDarkTheme() ? stored : (LIGHT_DISPLAY[stored.toLowerCase()] ?? stored);
+}
 
 interface View {
   scale: number;
@@ -43,7 +66,7 @@ function renderStrokes(
   ctx.setTransform(view.scale, 0, 0, view.scale, view.ox, view.oy);
 
   for (const stroke of strokes) {
-    if (stroke.points.length < 2) continue;
+    if (stroke.points.length < (stroke.tool === "text" ? 1 : 2)) continue;
 
     ctx.save();
     ctx.beginPath();
@@ -56,7 +79,13 @@ function renderStrokes(
       ctx.strokeStyle = "rgba(0,0,0,1)";
     } else {
       ctx.globalCompositeOperation = "source-over";
-      ctx.strokeStyle = stroke.color;
+      ctx.strokeStyle = displayColor(stroke.color);
+    }
+
+    if (stroke.tool !== "pen" && stroke.tool !== "eraser") {
+      drawShape(ctx, stroke);
+      ctx.restore();
+      continue;
     }
 
     const pts = stroke.points;
@@ -72,6 +101,43 @@ function renderStrokes(
   }
 
   ctx.restore();
+}
+
+function drawShape(ctx: CanvasRenderingContext2D, stroke: DrawingStroke) {
+  const [a, b] = stroke.points;
+  const color = displayColor(stroke.color);
+  if (stroke.tool === "text") {
+    const text = String(stroke.text ?? "").slice(0, MAX_TEXT);
+    const size = textSize(stroke.width);
+    ctx.fillStyle = color;
+    ctx.font = TEXT_FONT(size);
+    ctx.textBaseline = "top";
+    text.split("\n").forEach((line, i) => ctx.fillText(line, a.x, a.y + i * size * 1.3));
+    return;
+  }
+  if (!b) return;
+  if (stroke.tool === "rect") {
+    ctx.strokeRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+  } else if (stroke.tool === "ellipse") {
+    ctx.beginPath();
+    ctx.ellipse((a.x + b.x) / 2, (a.y + b.y) / 2, Math.abs(b.x - a.x) / 2, Math.abs(b.y - a.y) / 2, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    if (stroke.tool === "arrow") {
+      const angle = Math.atan2(b.y - a.y, b.x - a.x);
+      const head = 10 + stroke.width * 2.5;
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x - head * Math.cos(angle - Math.PI / 7), b.y - head * Math.sin(angle - Math.PI / 7));
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x - head * Math.cos(angle + Math.PI / 7), b.y - head * Math.sin(angle + Math.PI / 7));
+      ctx.stroke();
+    }
+  }
 }
 
 /** World → screen coordinate conversion for cursor overlay positioning. */
@@ -116,6 +182,18 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const spaceDownRef = useRef(false);
   const [isPanMode, setIsPanMode] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const [textDraft, setTextDraft] = useState<{ world: { x: number; y: number }; screen: { x: number; y: number }; value: string } | null>(null);
+
+  const commitText = () => {
+    const draft = textDraft;
+    setTextDraft(null);
+    const text = draft?.value.trim().slice(0, MAX_TEXT);
+    if (!draft || !text) return;
+    addStroke({
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      tool: "text", color, width: strokeWidth, points: [draft.world], text,
+    });
+  };
   const panStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
 
   // Throttle for live stroke awareness updates (~30fps max)
@@ -141,13 +219,21 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       : [...strokesRef.current, ...live];
   };
 
+  // Repaint when the app theme flips so stroke colours re-map.
+  const [themeTick, setThemeTick] = useState(0);
+  useEffect(() => {
+    const obs = new MutationObserver(() => setThemeTick((n) => n + 1));
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
+  }, []);
+
   // Re-render canvas when committed strokes or peer cursors change
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     renderStrokes(canvas, getAllStrokes(currentStrokeRef.current), viewRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strokes, peerCursors]);
+  }, [strokes, peerCursors, themeTick]);
 
   // Resize observer
   useEffect(() => {
@@ -256,15 +342,22 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         return;
       }
       if (e.button !== 0) return;
+      const pt = getWorldPoint(e);
+      if (tool === "text") {
+        // Type in place; committed on Enter or when the box loses focus.
+        e.preventDefault();
+        const rect = e.currentTarget.getBoundingClientRect();
+        setTextDraft({ world: pt, screen: { x: e.clientX - rect.left, y: e.clientY - rect.top }, value: "" });
+        return;
+      }
       e.currentTarget.setPointerCapture(e.pointerId);
       isDrawingRef.current = true;
-      const pt = getWorldPoint(e);
       currentStrokeRef.current = {
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         tool,
         color,
         width: tool === "eraser" ? strokeWidth * 4 : strokeWidth,
-        points: [pt],
+        points: SHAPES.includes(tool) ? [pt, pt] : [pt],
       };
     },
     [tool, color, strokeWidth],
@@ -287,7 +380,19 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
 
       if (!isDrawingRef.current || !currentStrokeRef.current) return;
       const pt = getWorldPoint(e);
-      currentStrokeRef.current.points.push(pt);
+      const live = currentStrokeRef.current;
+      if (SHAPES.includes(live.tool)) {
+        let end = pt;
+        // Shift keeps rectangles square and ellipses round.
+        if (e.shiftKey && (live.tool === "rect" || live.tool === "ellipse")) {
+          const start = live.points[0];
+          const side = Math.max(Math.abs(pt.x - start.x), Math.abs(pt.y - start.y));
+          end = { x: start.x + Math.sign(pt.x - start.x || 1) * side, y: start.y + Math.sign(pt.y - start.y || 1) * side };
+        }
+        live.points = [live.points[0], end];
+      } else {
+        live.points.push(pt);
+      }
 
       // Local preview at full frame rate
       const canvas = canvasRef.current;
@@ -318,7 +423,11 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     // Commit the stroke FIRST so the Yjs doc update (TAG_DOC) is sent before
     // the awareness null (TAG_AWARENESS). Peers receive the committed stroke
     // before the live preview disappears, eliminating the erasure flicker.
-    if (stroke.points.length >= 2) {
+    const [a, b] = stroke.points;
+    const bigEnough = SHAPES.includes(stroke.tool)
+      ? !!b && Math.hypot(b.x - a.x, b.y - a.y) > 3
+      : stroke.points.length >= 2;
+    if (bigEnough) {
       addStroke(stroke);
     }
     updateLiveStroke(null);
@@ -356,15 +465,34 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     ? "grab"
     : tool === "eraser"
     ? "cell"
+    : tool === "text"
+    ? "text"
     : "crosshair";
+
+  const toolBtn = (active: boolean) =>
+    `h-8 w-8 grid place-items-center rounded-full transition-all duration-150 ${active ? "" : "hover:bg-[var(--bg-3)]"}`;
+  const toolBtnStyle = (active: boolean): React.CSSProperties => ({
+    background: active ? "var(--indigo)" : "transparent",
+    color: active ? "var(--on-primary)" : "var(--text-3)",
+  });
+  const divider = <div className="w-px h-5 mx-0.5" style={{ background: "var(--border)" }} />;
+  const floating: React.CSSProperties = {
+    background: "var(--bg)",
+    border: "1px solid var(--border)",
+    boxShadow: "var(--shadow-md)",
+  };
 
   return (
     <div className={`flex flex-col h-full ${className}`}>
-      {/* Canvas area */}
+      {/* Canvas area — a dotted whiteboard that follows the app theme */}
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden"
-        style={{ background: CANVAS_BG }}
+        style={{
+          background: "var(--editor-bg)",
+          backgroundImage: "radial-gradient(var(--border) 1px, transparent 1px)",
+          backgroundSize: "22px 22px",
+        }}
       >
         <canvas
           ref={canvasRef}
@@ -377,10 +505,38 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           onContextMenu={(e) => e.preventDefault()}
         />
 
+        {textDraft && (
+          <textarea
+            autoFocus
+            value={textDraft.value}
+            maxLength={MAX_TEXT}
+            onChange={(e) => setTextDraft({ ...textDraft, value: e.target.value })}
+            onBlur={commitText}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { e.preventDefault(); setTextDraft(null); }
+              else if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitText(); }
+            }}
+            placeholder={t("drawing.textPlaceholder")}
+            rows={Math.max(1, textDraft.value.split("\n").length)}
+            className="absolute resize-none bg-transparent outline-none border-0 p-0 m-0"
+            style={{
+              left: textDraft.screen.x,
+              top: textDraft.screen.y,
+              minWidth: 160,
+              color: displayColor(color),
+              font: TEXT_FONT(textSize(strokeWidth) * viewRef.current.scale),
+              lineHeight: 1.3,
+              caretColor: displayColor(color),
+              boxShadow: "0 0 0 1px var(--border-2)",
+              borderRadius: 4,
+            }}
+          />
+        )}
+
         {/* Empty hint */}
         {strokes.length === 0 && peerCursors.every((p) => !p.liveStroke) && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-slate-700 text-sm select-none">
+            <span className="text-sm select-none" style={{ color: "var(--subtle)" }}>
               {t("drawing.startDrawing")}
             </span>
           </div>
@@ -395,16 +551,12 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           return (
             <div
               key={peer.clientId}
-              className="absolute pointer-events-none flex items-center gap-1 whitespace-nowrap"
-              style={{ left: screen.x + 8, top: screen.y + 8 }}
+              className="absolute pointer-events-none whitespace-nowrap"
+              style={{ left: screen.x + 10, top: screen.y + 10 }}
             >
               <span
-                className="h-2.5 w-2.5 rounded-full flex-shrink-0 shadow-sm"
+                className="text-[11px] font-semibold px-1.5 py-0.5 rounded-[4px] text-white shadow-sm"
                 style={{ background: peer.color }}
-              />
-              <span
-                className="text-[11px] font-medium px-1.5 py-0.5 rounded"
-                style={{ background: peer.color + "22", color: peer.color, border: `1px solid ${peer.color}44` }}
               >
                 {peer.name}
               </span>
@@ -412,165 +564,133 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           );
         })}
 
-        {/* Zoom controls overlay */}
-        <div className="absolute bottom-3 right-3 flex items-center gap-0.5 bg-slate-950/80 border border-slate-700 rounded-md px-1 py-0.5 backdrop-blur-sm">
-          <button
-            type="button"
-            onClick={() => zoom(1 / 1.25)}
-            className="h-6 w-6 flex items-center justify-center rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-            title={t("drawing.zoomOut")}
-          >
+        {/* Zoom controls */}
+        <div className="absolute bottom-4 right-4 flex items-center gap-0.5 rounded-full p-1" style={floating}>
+          <button type="button" onClick={() => zoom(1 / 1.25)} className={toolBtn(false)} style={toolBtnStyle(false)} title={t("drawing.zoomOut")}>
             <ZoomOut className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={resetView}
-            className="px-1.5 text-[11px] font-mono text-slate-400 hover:text-slate-200 min-w-[3.5rem] text-center transition-colors"
+            className="px-1.5 h-8 rounded-full text-[11px] font-mono min-w-[3.25rem] text-center transition-colors hover:bg-[var(--bg-3)]"
+            style={{ color: "var(--text-2)" }}
             title={t("drawing.resetView")}
           >
             {Math.round(displayScale * 100)}%
           </button>
-          <button
-            type="button"
-            onClick={() => zoom(1.25)}
-            className="h-6 w-6 flex items-center justify-center rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-            title={t("drawing.zoomIn")}
-          >
+          <button type="button" onClick={() => zoom(1.25)} className={toolBtn(false)} style={toolBtnStyle(false)} title={t("drawing.zoomIn")}>
             <ZoomIn className="h-3.5 w-3.5" />
           </button>
         </div>
 
         {/* Pan mode hint */}
         {isPanMode && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-slate-800/90 border border-slate-700 text-[11px] text-slate-400 pointer-events-none select-none backdrop-blur-sm">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[12px] pointer-events-none select-none" style={{ ...floating, color: "var(--text-2)" }}>
             {t("drawing.panHint")}
           </div>
         )}
 
-        {/* Connected peers indicator */}
+        {/* Connected peers */}
         {peerCursors.length > 0 && (
-          <div className="absolute top-3 right-3 flex items-center gap-1 bg-slate-950/80 border border-slate-700 rounded-md px-2 py-1 backdrop-blur-sm">
+          <div className="absolute top-4 right-4 flex items-center gap-2 rounded-full px-3 h-8" style={floating}>
             {peerCursors.map((peer) => (
-              <div
-                key={peer.clientId}
-                className="flex items-center gap-1"
-                title={peer.name}
-              >
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{ background: peer.color }}
-                />
-                <span className="text-[10px] text-slate-400 max-w-[5rem] truncate">
-                  {peer.name}
-                </span>
+              <div key={peer.clientId} className="flex items-center gap-1.5" title={peer.name}>
+                <span className="h-2 w-2 rounded-full" style={{ background: peer.color }} />
+                <span className="text-[11px] font-medium max-w-[6rem] truncate" style={{ color: "var(--text-2)" }}>{peer.name}</span>
               </div>
             ))}
           </div>
         )}
-      </div>
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-3 px-4 py-2 border-t border-slate-800 bg-slate-950/90 flex-wrap">
-        {/* Tool buttons */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setTool("pen")}
-            title={t("drawing.pen")}
-            className={`h-7 w-7 flex items-center justify-center rounded border transition-colors ${
-              tool === "pen"
-                ? "border-sky-500 bg-slate-900 text-sky-400"
-                : "border-slate-700 bg-slate-950 text-slate-400 hover:bg-slate-900"
-            }`}
-          >
+        {/* Floating toolbar */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full p-1 max-w-[calc(100%-180px)] overflow-x-auto" style={floating}>
+          <button type="button" onClick={() => setTool("pen")} title={t("drawing.pen")} className={toolBtn(tool === "pen")} style={toolBtnStyle(tool === "pen")}>
             <Pencil className="h-3.5 w-3.5" />
           </button>
-          <button
-            type="button"
-            onClick={() => setTool("eraser")}
-            title={t("drawing.eraser")}
-            className={`h-7 w-7 flex items-center justify-center rounded border transition-colors ${
-              tool === "eraser"
-                ? "border-sky-500 bg-slate-900 text-sky-400"
-                : "border-slate-700 bg-slate-950 text-slate-400 hover:bg-slate-900"
-            }`}
-          >
+          <button type="button" onClick={() => setTool("eraser")} title={t("drawing.eraser")} className={toolBtn(tool === "eraser")} style={toolBtnStyle(tool === "eraser")}>
             <Eraser className="h-3.5 w-3.5" />
           </button>
-        </div>
-
-        <div className="w-px h-5 bg-slate-800" />
-
-        {/* Color palette */}
-        <div className="flex items-center gap-1">
-          {COLORS.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              onClick={() => { setColor(c.value); setTool("pen"); }}
-              title={t(c.labelKey)}
-              className={`h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 ${
-                color === c.value && tool === "pen"
-                  ? "border-sky-400 scale-110"
-                  : "border-slate-700"
-              }`}
-              style={{ background: c.value }}
-            />
-          ))}
-        </div>
-
-        <div className="w-px h-5 bg-slate-800" />
-
-        {/* Stroke width */}
-        <div className="flex items-center gap-1">
-          {WIDTHS.map((w) => (
-            <button
-              key={w.value}
-              type="button"
-              onClick={() => setStrokeWidth(w.value)}
-              title={t(w.labelKey)}
-              className={`h-7 w-9 flex items-center justify-center rounded border transition-colors ${
-                strokeWidth === w.value
-                  ? "border-sky-500 bg-slate-900"
-                  : "border-slate-700 bg-slate-950 hover:bg-slate-900"
-              }`}
-            >
-              <div
-                className="rounded-full bg-slate-300"
-                style={{ width: Math.min(w.value * 2.5, 28), height: w.value }}
-              />
+          {([
+            ["text", Type, "drawing.text"],
+            ["rect", Square, "drawing.rect"],
+            ["ellipse", Circle, "drawing.ellipse"],
+            ["line", Minus, "drawing.line"],
+            ["arrow", ArrowUpRight, "drawing.arrow"],
+          ] as const).map(([id, Icon, label]) => (
+            <button key={id} type="button" onClick={() => setTool(id)} title={t(label)} aria-label={t(label)} aria-pressed={tool === id}
+              className={toolBtn(tool === id)} style={toolBtnStyle(tool === id)}>
+              <Icon className="h-3.5 w-3.5" />
             </button>
           ))}
-        </div>
 
-        <div className="w-px h-5 bg-slate-800" />
+          {divider}
 
-        {/* Clear */}
-        <button
-          type="button"
-          onClick={clearStrokes}
-          title={t("drawing.clearCanvas")}
-          className="h-7 px-2 flex items-center gap-1 rounded border border-slate-700 bg-slate-950 text-slate-400 hover:bg-slate-900 hover:text-red-400 hover:border-red-500/50 transition-colors text-xs"
-        >
-          <Trash2 className="h-3 w-3" />
-          <span>{t("drawing.clear")}</span>
-        </button>
+          <div className="flex items-center gap-1 px-1">
+            {COLORS.map((c) => {
+              const active = color === c.value && tool !== "eraser";
+              return (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => { setColor(c.value); if (tool === "eraser") setTool("pen"); }}
+                  title={t(c.labelKey)}
+                  aria-pressed={active}
+                  className="h-5 w-5 rounded-full transition-transform duration-150 hover:scale-110"
+                  style={{
+                    background: displayColor(c.value),
+                    boxShadow: active ? "0 0 0 2px var(--bg), 0 0 0 4px var(--text-3)" : "inset 0 0 0 1px rgba(0,0,0,0.08)",
+                    transform: active ? "scale(1.1)" : undefined,
+                  }}
+                />
+              );
+            })}
+          </div>
 
-        {/* Open fullscreen */}
-        {!isFullscreen && roomId && (
-          <>
-            <div className="w-px h-5 bg-slate-800" />
+          {divider}
+
+          <div className="flex items-center gap-0.5">
+            {WIDTHS.map((w) => (
+              <button
+                key={w.value}
+                type="button"
+                onClick={() => setStrokeWidth(w.value)}
+                title={t(w.labelKey)}
+                className="h-8 w-9 grid place-items-center rounded-full transition-colors hover:bg-[var(--bg-3)]"
+                style={{ background: strokeWidth === w.value ? "var(--bg-3)" : "transparent" }}
+              >
+                <div
+                  className="rounded-full"
+                  style={{ width: Math.min(w.value * 2.5, 22), height: Math.max(2, w.value), background: strokeWidth === w.value ? "var(--text)" : "var(--text-3)" }}
+                />
+              </button>
+            ))}
+          </div>
+
+          {divider}
+
+          <button
+            type="button"
+            onClick={clearStrokes}
+            title={t("drawing.clearCanvas")}
+            className="h-8 px-3 flex items-center gap-1.5 rounded-full text-[12px] font-medium transition-colors hover:bg-[var(--rose-10)] hover:text-[var(--rose)]"
+            style={{ color: "var(--text-3)" }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span>{t("drawing.clear")}</span>
+          </button>
+
+          {!isFullscreen && roomId && (
             <button
               type="button"
               onClick={handleOpenFullscreen}
               title={t("drawing.openInNewTab")}
-              className="h-7 px-2 flex items-center gap-1 rounded border border-slate-700 bg-slate-950 text-slate-400 hover:bg-slate-900 hover:text-sky-400 hover:border-sky-500/50 transition-colors text-xs ml-auto"
+              className={toolBtn(false)}
+              style={toolBtnStyle(false)}
             >
-              <Maximize2 className="h-3 w-3" />
-              <span>{t("drawing.fullscreen")}</span>
+              <Maximize2 className="h-3.5 w-3.5" />
             </button>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

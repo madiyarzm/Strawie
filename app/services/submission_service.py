@@ -1,5 +1,5 @@
 """
-Business logic for submissions and sandbox integration.
+Business logic for submissions. Code is never executed on the server.
 
 Creates Submission records, enforces retention (submissions older than
 submission_retention_days are hidden and removed by startup cleanup).
@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.config import get_settings
 from app.models.assignment import Assignment
-from app.services.sandbox_service import run_code
 from app.models.classroom import Classroom
 from app.models.submission import Submission
 from app.models.user import User
@@ -153,40 +152,29 @@ def create_submission(
     assignment_id: UUID,
     user: User,
     code: str,
-    client_status: str | None = None,
+    client_status: str,
     client_result: dict | None = None,
 ) -> Submission:
     """
     Create a new submission for an assignment.
 
-    If `client_status` and `client_result` are provided (Pyodide path) they
-    are stored as-is after sanitization. Otherwise the server runs the code
-    in its own sandbox.
+    The code was already run in the student's browser (Pyodide); the server
+    only stores the sanitized result. It never executes user code: this is an
+    open-source app without a hardened sandbox, so running untrusted Python
+    server-side would be an unacceptable risk. The trade-off is that a
+    determined student could fake their own result, which is fine for
+    classroom practice.
     """
 
     assignment = get_assignment_or_404(db, assignment_id=assignment_id)
     classroom = _get_classroom_from_assignment(db, assignment)
     ensure_user_can_access_classroom(classroom, user, db)
 
-    if client_status in _ALLOWED_STATUSES:
-        status = client_status
-        result_json = _sanitize_client_result(client_result)
-        result_json.setdefault("test_passed", None)
-    else:
-        sandbox_result = run_code(code)
-        result_json = {
-            "stdout": sandbox_result.stdout or "",
-            "stderr": sandbox_result.stderr or "",
-            **(sandbox_result.result_json or {}),
-        }
-        if assignment.test_code and assignment.test_code.strip():
-            combined = code + "\n\n# === auto-grader ===\n" + assignment.test_code
-            test_result = run_code(combined)
-            result_json["test_passed"] = test_result.status == "success"
-            result_json["test_output"] = (test_result.stdout or "") + (test_result.stderr or "")
-        else:
-            result_json["test_passed"] = None
-        status = sandbox_result.status
+    if client_status not in _ALLOWED_STATUSES:
+        raise ValueError("invalid_status")
+    status = client_status
+    result_json = _sanitize_client_result(client_result)
+    result_json.setdefault("test_passed", None)
 
     submission = Submission(
         assignment_id=assignment.id,

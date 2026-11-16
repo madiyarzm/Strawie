@@ -15,7 +15,7 @@ export const DrawingPage: React.FC = () => {
   const decodedRoomId = roomId ? decodeURIComponent(roomId) : undefined;
 
   return (
-    <div style={{ width: "100vw", height: "100vh", background: "#020617", display: "flex", flexDirection: "column" }}>
+    <div style={{ width: "100vw", height: "100vh", background: "var(--editor-bg)", display: "flex", flexDirection: "column" }}>
       <DrawingCanvas
         roomId={decodedRoomId}
         userName={name}

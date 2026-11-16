@@ -6,12 +6,20 @@ import {
   applyAwarenessUpdate,
 } from "y-protocols/awareness";
 
+export type DrawingTool = "pen" | "eraser" | "rect" | "ellipse" | "line" | "arrow" | "text";
+
+/**
+ * One item on the whiteboard. Freehand tools keep every point; shapes keep
+ * [start, end]; text keeps [anchor] plus `text`. Everything is drawn on the
+ * canvas, never inserted as HTML, so text from a peer can't inject markup.
+ */
 export type DrawingStroke = {
   id: string;
-  tool: "pen" | "eraser";
+  tool: DrawingTool;
   color: string;
   width: number;
   points: { x: number; y: number }[];
+  text?: string;
 };
 
 /** A peer's awareness state: their user info and any in-progress stroke. */

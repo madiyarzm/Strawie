@@ -2,10 +2,11 @@
 Pydantic schemas for Assignment and Submission entities.
 
 Assignments define what students should implement; submissions capture
-their code and the sandbox execution result.
+their code and the result of running it in the student's browser.
 """
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -61,14 +62,14 @@ class SubmissionCreate(SubmissionBase):
     """
     Payload for creating a submission for an assignment.
 
-    `status` and `result_json` may be supplied by a trusted client-side
-    runner (Pyodide). When present the server stores them as-is instead of
-    re-executing the code. When absent the server falls back to its own
-    sandbox executor.
+    The code runs in the student's browser (Pyodide); `status` and
+    `result_json` carry that run's outcome. The server never executes
+    submitted code, so both describe the client's run and are stored after
+    sanitization.
     """
 
     assignment_id: UUID
-    status: str | None = None
+    status: Literal["success", "error", "timeout"]
     result_json: dict | None = None
 
 

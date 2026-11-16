@@ -8,7 +8,7 @@
 ![Yjs](https://img.shields.io/badge/Yjs-CRDT-orange?style=flat)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)
 
-> A real-time collaborative platform for teaching Python. Teachers run classrooms and assignments; students write, run, and submit code straight in the browser — with live multi-user editing, sandboxed execution, AI hints, and gamified progress.
+> A real-time collaborative platform for teaching Python. Teachers run classrooms and assignments; students write, run, and submit code straight in the browser — with live multi-user editing, in-browser Python execution, AI hints, and gamified progress.
 
 **Live:** [strawie.dev](https://strawie.dev)
 
@@ -19,7 +19,7 @@
 | Area | Highlights |
 |---|---|
 | **Teaching** | Groups with invite codes → classrooms → assignments (starter code, hidden tests, deadlines). Teachers see every submission and leave inline feedback. |
-| **Coding** | Multi-file CodeMirror editor, interactive Python runner with live stdin, pass/fail test results. |
+| **Coding** | Multi-file CodeMirror editor, in-browser Python runner with live stdin, pass/fail test results. |
 | **Collaboration** | Conflict-free real-time co-editing and a shared drawing canvas for sketching schemes — same CRDT engine behind both. |
 | **Learning loop** | XP and levels, unlockable cosmetics, AI hints (Claude) after repeated failures, a personal solo **Workspace** for free practice. |
 | **Roles** | `student`, `teacher`, `admin` — capabilities enforced server-side; admins can preview the app as either role. |
@@ -38,38 +38,38 @@
 │  Backend — FastAPI (Python 3.12)                             │
 │  Routes → Services → Models / Schemas   (layered, DI)        │
 │  ├─ /api/v1/*           auth, groups, classrooms, submissions │
-│  ├─ /ws/collab/{room}   Yjs binary relay (stateless)         │
-│  └─ /ws/sandbox/run     streaming, interactive execution     │
-└──────┬─────────────────┬────────────────────┬────────────────┘
-       │                 │                    │
-┌──────▼──────┐  ┌────────▼────────┐  ┌────────▼─────────┐
-│ PostgreSQL  │  │ Sandbox         │  │ Collab manager   │
-│ (Supabase)  │  │ subprocess /    │  │ in-memory room   │
-│ SQLAlchemy  │  │ Docker /        │  │ → socket registry│
-│ + Alembic   │  │ Pyodide (WASM)  │  │                  │
-└─────────────┘  └─────────────────┘  └──────────────────┘
+│  └─ /ws/collab/{room}   Yjs binary relay (stateless)         │
+└──────┬───────────────────────────────────────┬───────────────┘
+       │                                       │
+┌──────▼──────┐                       ┌────────▼─────────┐
+│ PostgreSQL  │                       │ Collab manager   │
+│ (Supabase)  │                       │ in-memory room   │
+│ SQLAlchemy  │                       │ → socket registry│
+│ + Alembic   │                       │                  │
+└─────────────┘                       └──────────────────┘
+
+Python runs only in the browser: Pyodide (WebAssembly) in a Web Worker.
 ```
 
 ---
 
 ## Key architectural decisions
 
-### 1. Defense-in-depth code execution
-Student code never runs in the app process. Three isolation strategies share one `SandboxExecutor` interface:
-- **Subprocess (default)** — stripped builtins (`open`, `exec`, `eval`…), a module allowlist, an **env-var allowlist** so secrets are unreachable from inside the sandbox, plus wall-clock and output caps.
-- **Docker (optional )** — `--network=none`, read-only FS, memory/PID limits, non-root user.
-- **Pyodide (in-browser WASM)** — graded submissions run client-side, fully off the server.
-
-A streaming WebSocket sandbox (`/ws/sandbox/run`) adds **interactive stdin** — programs pause on `input()` and the user types in the terminal, VS Code style.
+### 1. The server never runs student code
+All Python runs in the student's own browser: **Pyodide** (CPython compiled to WebAssembly) inside a **Web Worker** (`frontend-vite/public/py-worker.js`). The server only stores code and results. For an open-source app without a security team, that removes the riskiest attack surface entirely: there is no server sandbox to escape.
+- The Pyodide loader is downloaded, checked against a pinned **SHA-384** hash, and only then executed.
+- **Interactive `input()`** and instant **Stop** use `SharedArrayBuffer` + `Atomics`, enabled by cross-origin isolation headers (`COOP: same-origin`, `COEP: require-corp`).
+- Runaway programs are interrupted (`KeyboardInterrupt`), and the worker is killed and replaced if they don't stop. Output is capped per run.
+- Grading (teacher tests) also runs in the browser. A determined student could fake their own result; that's an accepted trade-off for classroom practice.
 
 ### 2. Real-time collaboration via CRDT
 Editing and the drawing canvas both run on **Yjs**, a Conflict-free Replicated Data Type. The server is a **stateless binary relay** — it broadcasts opaque updates between peers in a room and never interprets them; conflict resolution happens entirely client-side. A separate awareness channel carries cursors, names, and role colors. Room access is authorized before a socket joins.
 
 ### 3. Layered service architecture
-`Routes → Services → Models/Schemas`, with dependencies (DB session, current user) injected via FastAPI's DI. Routes only validate and delegate; all domain logic lives in services. Each layer is independently testable and swappable (the sandbox backend is a single config flag).
+`Routes → Services → Models/Schemas`, with dependencies (DB session, current user) injected via FastAPI's DI. Routes only validate and delegate; all domain logic lives in services. Each layer is independently testable and swappable.
 
 ### 4. Cookie-based auth + locked roles
-Google OAuth issues a JWT stored in an **httpOnly cookie** (not `localStorage`), so it's invisible to client-side JS. Role is chosen once and **locked** server-side — there's no path to escalate from student to teacher later. Submission and sandbox endpoints are rate-limited per IP/user.
+Google OAuth issues a JWT stored in an **httpOnly cookie** (not `localStorage`), so it's invisible to client-side JS. Role is chosen once and **locked** server-side — there's no path to escalate from student to teacher later. Submission endpoints are rate-limited per IP/user.
 
 ---
 
@@ -90,9 +90,8 @@ Google OAuth issues a JWT stored in an **httpOnly cookie** (not `localStorage`),
 ```
 app/                  FastAPI backend
 ├── api/v1/            REST route handlers
-├── api/ws_*.py        WebSocket endpoints (collab, interactive sandbox)
+├── api/ws_*.py        WebSocket endpoints (collab)
 ├── services/          business logic layer
-├── sandbox/           subprocess + Docker executors
 ├── models/  schemas/  SQLAlchemy ORM + Pydantic contracts
 └── core/              auth, security, rate limiting, room ACL
 frontend-vite/src/     React app (editor, dashboard, collab hooks)

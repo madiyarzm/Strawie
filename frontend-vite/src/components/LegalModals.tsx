@@ -370,7 +370,8 @@ export const PrivacyModal: React.FC<{ onClose: () => void }> = ({ onClose }) => 
                 </h3>
                 <p>
                   We take reasonable measures to protect stored data, including
-                  sandboxed code execution and rate-limited endpoints. No system
+                  running all code in your own browser (never on our servers)
+                  and rate-limited endpoints. No system
                   is 100% secure, and Strawie cannot guarantee absolute security
                   of transmitted or stored data.
                 </p>

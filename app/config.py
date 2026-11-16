@@ -52,22 +52,27 @@ class Settings(BaseSettings):
         description="Email of the admin/owner account. Auto-assigned teacher role on first login.",
     )
 
-    # Sandbox: real code execution (subprocess by default; Docker optional)
-    sandbox_timeout_seconds: int = Field(
-        default=10,
-        description="Max execution time per run. Prevents runaway code.",
+    # Public demo rooms ("Try demo" — no signup). Guests are a restricted role
+    # enforced in app/dependencies.py and app/core/ws_acl.py.
+    demo_enabled: bool = Field(
+        default=True,
+        description="Expose the public /api/v1/demo endpoints. Set False to kill the demo instantly.",
     )
-    sandbox_max_output_bytes: int = Field(
-        default=256 * 1024,
-        description="Max stdout+stderr bytes to capture before truncation.",
+    demo_room_ttl_hours: int = Field(
+        default=3,
+        ge=1,
+        le=24,
+        description="How long a demo room (and its guest token) stays valid before lazy/sweep expiry.",
     )
-    sandbox_use_docker: bool = Field(
-        default=False,
-        description="Use Docker executor when True and Docker available; else subprocess.",
+    demo_rooms_per_hour_per_ip: int = Field(
+        default=5,
+        ge=1,
+        description="Max demo rooms one IP may create per hour. A real reviewer needs 1-2.",
     )
-    sandbox_docker_image: str = Field(
-        default="lambda-sandbox:latest",
-        description="Docker image for sandbox (e.g. built from docker/sandbox.Dockerfile).",
+    demo_rooms_per_day_per_ip: int = Field(
+        default=20,
+        ge=1,
+        description="Daily ceiling per IP, so a slow drip cannot fill the table.",
     )
 
     # Submissions: keep only for this many days; older ones are hidden and deleted on cleanup.
