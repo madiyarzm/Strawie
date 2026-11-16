@@ -481,6 +481,12 @@
     "not-started": "Не начато"
   },
   "drawing": {
+    "text": "Текст",
+    "rect": "Прямоугольник",
+    "ellipse": "Эллипс",
+    "line": "Линия",
+    "arrow": "Стрелка",
+    "textPlaceholder": "Введите текст и нажмите Enter",
     "colorWhite": "Белый",
     "colorSky": "Небесный",
     "colorViolet": "Фиолетовый",

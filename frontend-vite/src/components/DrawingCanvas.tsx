@@ -1,10 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pencil, Eraser, Trash2, Maximize2, ZoomIn, ZoomOut } from "lucide-react";
+import { Pencil, Eraser, Trash2, Maximize2, ZoomIn, ZoomOut, Type, Square, Circle, Minus, ArrowUpRight } from "lucide-react";
 import { useCollabDrawing } from "../hooks/useCollabDrawing";
-import type { DrawingStroke, PeerCursor } from "../hooks/useCollabDrawing";
+import type { DrawingStroke, DrawingTool, PeerCursor } from "../hooks/useCollabDrawing";
 
-type Tool = "pen" | "eraser";
+type Tool = DrawingTool;
+const SHAPES: Tool[] = ["rect", "ellipse", "line", "arrow"];
+const MAX_TEXT = 500;
+const textSize = (width: number) => 12 + width * 3;
+const TEXT_FONT = (size: number) => `600 ${size}px "Plus Jakarta Sans", system-ui, -apple-system, sans-serif`;
 
 const COLORS = [
   { value: "#e2e8f0", labelKey: "drawing.colorWhite" },
@@ -62,7 +66,7 @@ function renderStrokes(
   ctx.setTransform(view.scale, 0, 0, view.scale, view.ox, view.oy);
 
   for (const stroke of strokes) {
-    if (stroke.points.length < 2) continue;
+    if (stroke.points.length < (stroke.tool === "text" ? 1 : 2)) continue;
 
     ctx.save();
     ctx.beginPath();
@@ -78,6 +82,12 @@ function renderStrokes(
       ctx.strokeStyle = displayColor(stroke.color);
     }
 
+    if (stroke.tool !== "pen" && stroke.tool !== "eraser") {
+      drawShape(ctx, stroke);
+      ctx.restore();
+      continue;
+    }
+
     const pts = stroke.points;
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length - 1; i++) {
@@ -91,6 +101,43 @@ function renderStrokes(
   }
 
   ctx.restore();
+}
+
+function drawShape(ctx: CanvasRenderingContext2D, stroke: DrawingStroke) {
+  const [a, b] = stroke.points;
+  const color = displayColor(stroke.color);
+  if (stroke.tool === "text") {
+    const text = String(stroke.text ?? "").slice(0, MAX_TEXT);
+    const size = textSize(stroke.width);
+    ctx.fillStyle = color;
+    ctx.font = TEXT_FONT(size);
+    ctx.textBaseline = "top";
+    text.split("\n").forEach((line, i) => ctx.fillText(line, a.x, a.y + i * size * 1.3));
+    return;
+  }
+  if (!b) return;
+  if (stroke.tool === "rect") {
+    ctx.strokeRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+  } else if (stroke.tool === "ellipse") {
+    ctx.beginPath();
+    ctx.ellipse((a.x + b.x) / 2, (a.y + b.y) / 2, Math.abs(b.x - a.x) / 2, Math.abs(b.y - a.y) / 2, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    if (stroke.tool === "arrow") {
+      const angle = Math.atan2(b.y - a.y, b.x - a.x);
+      const head = 10 + stroke.width * 2.5;
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x - head * Math.cos(angle - Math.PI / 7), b.y - head * Math.sin(angle - Math.PI / 7));
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x - head * Math.cos(angle + Math.PI / 7), b.y - head * Math.sin(angle + Math.PI / 7));
+      ctx.stroke();
+    }
+  }
 }
 
 /** World → screen coordinate conversion for cursor overlay positioning. */
@@ -135,6 +182,18 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const spaceDownRef = useRef(false);
   const [isPanMode, setIsPanMode] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const [textDraft, setTextDraft] = useState<{ world: { x: number; y: number }; screen: { x: number; y: number }; value: string } | null>(null);
+
+  const commitText = () => {
+    const draft = textDraft;
+    setTextDraft(null);
+    const text = draft?.value.trim().slice(0, MAX_TEXT);
+    if (!draft || !text) return;
+    addStroke({
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      tool: "text", color, width: strokeWidth, points: [draft.world], text,
+    });
+  };
   const panStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
 
   // Throttle for live stroke awareness updates (~30fps max)
@@ -283,15 +342,22 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         return;
       }
       if (e.button !== 0) return;
+      const pt = getWorldPoint(e);
+      if (tool === "text") {
+        // Type in place; committed on Enter or when the box loses focus.
+        e.preventDefault();
+        const rect = e.currentTarget.getBoundingClientRect();
+        setTextDraft({ world: pt, screen: { x: e.clientX - rect.left, y: e.clientY - rect.top }, value: "" });
+        return;
+      }
       e.currentTarget.setPointerCapture(e.pointerId);
       isDrawingRef.current = true;
-      const pt = getWorldPoint(e);
       currentStrokeRef.current = {
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         tool,
         color,
         width: tool === "eraser" ? strokeWidth * 4 : strokeWidth,
-        points: [pt],
+        points: SHAPES.includes(tool) ? [pt, pt] : [pt],
       };
     },
     [tool, color, strokeWidth],
@@ -314,7 +380,19 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
 
       if (!isDrawingRef.current || !currentStrokeRef.current) return;
       const pt = getWorldPoint(e);
-      currentStrokeRef.current.points.push(pt);
+      const live = currentStrokeRef.current;
+      if (SHAPES.includes(live.tool)) {
+        let end = pt;
+        // Shift keeps rectangles square and ellipses round.
+        if (e.shiftKey && (live.tool === "rect" || live.tool === "ellipse")) {
+          const start = live.points[0];
+          const side = Math.max(Math.abs(pt.x - start.x), Math.abs(pt.y - start.y));
+          end = { x: start.x + Math.sign(pt.x - start.x || 1) * side, y: start.y + Math.sign(pt.y - start.y || 1) * side };
+        }
+        live.points = [live.points[0], end];
+      } else {
+        live.points.push(pt);
+      }
 
       // Local preview at full frame rate
       const canvas = canvasRef.current;
@@ -345,7 +423,11 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     // Commit the stroke FIRST so the Yjs doc update (TAG_DOC) is sent before
     // the awareness null (TAG_AWARENESS). Peers receive the committed stroke
     // before the live preview disappears, eliminating the erasure flicker.
-    if (stroke.points.length >= 2) {
+    const [a, b] = stroke.points;
+    const bigEnough = SHAPES.includes(stroke.tool)
+      ? !!b && Math.hypot(b.x - a.x, b.y - a.y) > 3
+      : stroke.points.length >= 2;
+    if (bigEnough) {
       addStroke(stroke);
     }
     updateLiveStroke(null);
@@ -383,6 +465,8 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     ? "grab"
     : tool === "eraser"
     ? "cell"
+    : tool === "text"
+    ? "text"
     : "crosshair";
 
   const toolBtn = (active: boolean) =>
@@ -420,6 +504,34 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           onPointerLeave={handlePointerUp}
           onContextMenu={(e) => e.preventDefault()}
         />
+
+        {textDraft && (
+          <textarea
+            autoFocus
+            value={textDraft.value}
+            maxLength={MAX_TEXT}
+            onChange={(e) => setTextDraft({ ...textDraft, value: e.target.value })}
+            onBlur={commitText}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { e.preventDefault(); setTextDraft(null); }
+              else if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitText(); }
+            }}
+            placeholder={t("drawing.textPlaceholder")}
+            rows={Math.max(1, textDraft.value.split("\n").length)}
+            className="absolute resize-none bg-transparent outline-none border-0 p-0 m-0"
+            style={{
+              left: textDraft.screen.x,
+              top: textDraft.screen.y,
+              minWidth: 160,
+              color: displayColor(color),
+              font: TEXT_FONT(textSize(strokeWidth) * viewRef.current.scale),
+              lineHeight: 1.3,
+              caretColor: displayColor(color),
+              boxShadow: "0 0 0 1px var(--border-2)",
+              borderRadius: 4,
+            }}
+          />
+        )}
 
         {/* Empty hint */}
         {strokes.length === 0 && peerCursors.every((p) => !p.liveStroke) && (
@@ -498,17 +610,29 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           <button type="button" onClick={() => setTool("eraser")} title={t("drawing.eraser")} className={toolBtn(tool === "eraser")} style={toolBtnStyle(tool === "eraser")}>
             <Eraser className="h-3.5 w-3.5" />
           </button>
+          {([
+            ["text", Type, "drawing.text"],
+            ["rect", Square, "drawing.rect"],
+            ["ellipse", Circle, "drawing.ellipse"],
+            ["line", Minus, "drawing.line"],
+            ["arrow", ArrowUpRight, "drawing.arrow"],
+          ] as const).map(([id, Icon, label]) => (
+            <button key={id} type="button" onClick={() => setTool(id)} title={t(label)} aria-label={t(label)} aria-pressed={tool === id}
+              className={toolBtn(tool === id)} style={toolBtnStyle(tool === id)}>
+              <Icon className="h-3.5 w-3.5" />
+            </button>
+          ))}
 
           {divider}
 
           <div className="flex items-center gap-1 px-1">
             {COLORS.map((c) => {
-              const active = color === c.value && tool === "pen";
+              const active = color === c.value && tool !== "eraser";
               return (
                 <button
                   key={c.value}
                   type="button"
-                  onClick={() => { setColor(c.value); setTool("pen"); }}
+                  onClick={() => { setColor(c.value); if (tool === "eraser") setTool("pen"); }}
                   title={t(c.labelKey)}
                   aria-pressed={active}
                   className="h-5 w-5 rounded-full transition-transform duration-150 hover:scale-110"

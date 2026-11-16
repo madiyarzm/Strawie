@@ -473,6 +473,12 @@
     "not-started": "Not Started"
   },
   "drawing": {
+    "text": "Text",
+    "rect": "Rectangle",
+    "ellipse": "Ellipse",
+    "line": "Line",
+    "arrow": "Arrow",
+    "textPlaceholder": "Type, then Enter",
     "colorWhite": "White",
     "colorSky": "Sky",
     "colorViolet": "Violet",
