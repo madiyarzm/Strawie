@@ -36,8 +36,12 @@ export type RunHandle = {
   stop: () => void;
 };
 
+export type RunCell = { code: string; quiet?: boolean; name?: string };
+
 type StartOpts = {
   code: string;
+  /** Notebook mode: run these in one namespace instead of `code`. */
+  cells?: RunCell[];
   /** Lines fed to input() first, before asking the user. */
   stdinLines?: string[];
   /** When false, input() past `stdinLines` gets end-of-input instead of asking. */
@@ -239,7 +243,10 @@ export function startRun(opts: StartOpts): RunHandle {
   };
   active = run;
   armTimeout(run);
-  w.postMessage({ type: "run", id, code: opts.code, stdin: opts.stdinLines ?? [], interactive: opts.interactive !== false });
+  w.postMessage({
+    type: "run", id, code: opts.code, cells: opts.cells,
+    stdin: opts.stdinLines ?? [], interactive: opts.interactive !== false,
+  });
 
   const encoder = new TextEncoder();
   return {

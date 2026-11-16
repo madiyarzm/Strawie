@@ -49,6 +49,10 @@ import {
 import type { RunHandle } from "./lib/pyodideRunner";
 import { ChalkLogo } from "./components/Logo";
 import { SUPPORTED_LANGUAGES } from "./i18n";
+import { GroupScreen, GroupSheet, HomeScreen } from "./lessons/HomeScreens";
+import type { Nav as LessonNav } from "./lessons/HomeScreens";
+import { HomeworkScreen, LessonScreen, ReviewScreen } from "./lessons/LessonScreens";
+import type { Group as LessonGroup } from "./lessons/api";
 import { Avatar } from "./components/Avatar";
 import { Badge } from "./components/Badge";
 import { ActivityGraph } from "./components/ActivityGraph";
@@ -339,7 +343,7 @@ function xpLevel(xp: number): { level: number; title: string; next: number; prev
 
 // ─── App types ─────────────────────────────────────────────────────────────
 
-type View = "dashboard" | "classroom" | "assignment" | "submissions" | "workspace";
+type View = "home" | "group" | "lesson" | "homework" | "review" | "dashboard" | "classroom" | "assignment" | "submissions" | "workspace";
 
 // Synthetic assignment id for a student's personal scratchpad. It is never
 // persisted — the workspace has no classroom, no collab room, no submissions.
@@ -503,7 +507,12 @@ export const MentorApp: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [authChecked, setAuthChecked] = useState(false);
-  const [view, setView] = useState<View>("dashboard");
+  const [view, setView] = useState<View>("home");
+  // New schedule-driven screens (src/lessons).
+  const [navGroupId, setNavGroupId] = useState<string | null>(null);
+  const [navLessonId, setNavLessonId] = useState<string | null>(null);
+  const [groupSheet, setGroupSheet] = useState<{ group: LessonGroup | null } | null>(null);
+  const [groupRefresh, setGroupRefresh] = useState(0);
   const [user, setUser] = useState<any | null>(null);
 
   const [groups, setGroups] = useState<any[]>([]);
@@ -615,6 +624,18 @@ export const MentorApp: React.FC = () => {
           const clsMap: Record<string, any[]> = {};
           grps.forEach((g: any, idx: number) => { clsMap[g.id] = clsResults[idx] || []; });
           setGroupClassrooms(clsMap);
+        }
+        // Arrived through an invite link (/join/<code>) before signing in.
+        let pendingJoin: string | null = null;
+        try { pendingJoin = sessionStorage.getItem("strawie:join"); sessionStorage.removeItem("strawie:join"); } catch { /* storage off */ }
+        if (pendingJoin) {
+          try {
+            const joined = await joinGroup(pendingJoin);
+            const fresh = await listGroups();
+            setGroups(fresh || []);
+            const gid = joined?.group_id ?? joined?.id;
+            if (gid) { setNavGroupId(String(gid)); setView("group"); }
+          } catch { /* invalid code: just land on home */ }
         }
         setAuthChecked(true);
       } catch {
@@ -1000,6 +1021,20 @@ export const MentorApp: React.FC = () => {
   const drawingRoomId = !isWorkspaceView && currentClassroom && currentAssignment
     ? `drawing:${currentClassroom.id}:${currentAssignment.id}` : undefined;
 
+  const lessonNav: LessonNav = {
+    openLesson: id => { setNavLessonId(id); setView("lesson"); },
+    openHomework: id => { setNavLessonId(id); setView("homework"); },
+    openReview: id => { setNavLessonId(id ?? null); setView("review"); },
+    openGroup: id => { setNavGroupId(id); setView("group"); },
+    newGroup: () => setGroupSheet({ group: null }),
+    joinGroup: () => setShowJoinGroupModal(true),
+  };
+  const me = {
+    id: String(user?.id ?? ""),
+    displayName: `${(isAdmin || effectiveRole === "teacher") ? t("common.teacher") : t("common.student")} ${(user?.name || "").split(" ")[0]}`.trim(),
+    role: effectiveRole,
+  };
+
   if (!authChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg)" }}>
@@ -1015,13 +1050,19 @@ export const MentorApp: React.FC = () => {
   }
 
   // ── nav items per role ────────────────────────────────────────────────────
+  const HOME_ICON = "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6";
+  const REVIEW_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4";
+  const PROFILE_ICON = "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z";
   const teacherNav = [
-    { id: "dashboard" as View, label: t("app.nav.dashboard"), icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
+    { id: "home" as View, label: t("lessons.nav.home", { defaultValue: "Home" }), icon: HOME_ICON },
+    { id: "review" as View, label: t("lessons.review.title", { defaultValue: "Review" }), icon: REVIEW_ICON },
+    { id: "dashboard" as View, label: t("lessons.nav.overview", { defaultValue: "Overview" }), icon: "M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" },
     { id: "classroom" as View, label: t("app.nav.classroom"), icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
     { id: "submissions" as View, label: t("app.nav.submissions"), icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
   ];
   const studentNav = [
-    { id: "dashboard" as View, label: t("app.nav.dashboard"), icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
+    { id: "home" as View, label: t("lessons.nav.home", { defaultValue: "Home" }), icon: HOME_ICON },
+    { id: "dashboard" as View, label: t("lessons.nav.profile", { defaultValue: "Profile" }), icon: PROFILE_ICON },
     { id: "workspace" as View, label: t("app.nav.workspace"), icon: "M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm0 3h16" },
     { id: "classroom" as View, label: t("app.nav.classroom"), icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
     { id: "assignment" as View, label: t("app.nav.editor"), icon: "M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" },
@@ -1030,6 +1071,7 @@ export const MentorApp: React.FC = () => {
   // classroom nav item links to classroom view only if a classroom is selected
   const handleNavClick = (id: View) => {
     if (id === "workspace") { openWorkspace(); return; }
+    if (id === "review") { setNavLessonId(null); setView("review"); return; }
     if (id === "classroom" && !currentClassroom) return;
     if (id === "assignment" && !currentAssignment) return;
     if (id === "submissions" && !currentClassroom) return;
@@ -1103,13 +1145,13 @@ export const MentorApp: React.FC = () => {
           {!sidebarCollapsed && (
             <div style={{ marginTop: 18 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6px 0 10px", marginBottom: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-3)" }}>{t("app.sidebar.classrooms")}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-3)" }}>{t("lessons.nav.groups", { defaultValue: "Groups" })}</span>
                 <div style={{ display: "flex", gap: 2 }}>
                   <button onClick={handleJoinGroup} className="st-icon-btn" style={{ width: 24, height: 24 }} title={t("app.sidebar.join")}>
                     <LogIn className="h-3.5 w-3.5" />
                   </button>
                   {canCreate && (
-                    <button onClick={handleCreateGroup} className="st-icon-btn" style={{ width: 24, height: 24 }} title={t("app.sidebar.newGroup")}>
+                    <button onClick={() => setGroupSheet({ group: null })} className="st-icon-btn" style={{ width: 24, height: 24 }} title={t("app.sidebar.newGroup")}>
                       <Plus className="h-3.5 w-3.5" />
                     </button>
                   )}
@@ -1124,9 +1166,21 @@ export const MentorApp: React.FC = () => {
                     <div className="sidebar-row" style={{ display: "flex", alignItems: "center", borderRadius: 10 }}>
                       <button
                         onClick={() => toggleGroup(g.id)}
-                        style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0, height: 32, padding: "0 4px 0 8px", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-2)", fontSize: 13, fontWeight: 600 }}
+                        className="st-icon-btn"
+                        style={{ width: 22, height: 22, marginLeft: 4, visibility: classrooms.length > 0 || (isExpanded && canCreate) ? "visible" : "hidden" }}
+                        title={t("lessons.nav.olderClassrooms", { defaultValue: "Older classrooms" })}
+                        aria-expanded={isExpanded}
                       >
-                        <ChevronRight className="h-3.5 w-3.5" style={{ flexShrink: 0, color: "var(--text-3)", transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform 200ms var(--ease)" }} />
+                        <ChevronRight className="h-3.5 w-3.5" style={{ transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform 200ms var(--ease)" }} />
+                      </button>
+                      <button
+                        onClick={() => { setNavGroupId(g.id); setView("group"); }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0, height: 32, padding: "0 4px 0 4px",
+                          background: "transparent", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                          color: view === "group" && navGroupId === g.id ? "var(--text)" : "var(--text-2)",
+                        }}
+                      >
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</span>
                       </button>
                       <button
@@ -1221,6 +1275,24 @@ export const MentorApp: React.FC = () => {
 
         {/* Main content */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          {view === "home" && (
+            <HomeScreen user={user} role={effectiveRole} hasGroups={groups.length > 0} nav={lessonNav} />
+          )}
+          {view === "group" && navGroupId && (
+            <GroupScreen key={navGroupId} groupId={navGroupId} nav={lessonNav} refreshKey={groupRefresh}
+              onEditSchedule={g => setGroupSheet({ group: g })} />
+          )}
+          {view === "lesson" && navLessonId && (
+            <LessonScreen key={navLessonId} lessonId={navLessonId} me={me}
+              onBack={() => setView(navGroupId ? "group" : "home")} onReview={id => { setNavLessonId(id); setView("review"); }} />
+          )}
+          {view === "homework" && navLessonId && (
+            <HomeworkScreen key={navLessonId} lessonId={navLessonId} me={me} onBack={() => setView("home")} />
+          )}
+          {view === "review" && (
+            <ReviewScreen key={navLessonId ?? "list"} lessonId={navLessonId ?? undefined} me={me}
+              onBack={() => setNavLessonId(null)} onPick={id => setNavLessonId(id)} />
+          )}
           {view === "dashboard" && (
             <DashboardView
               user={user}
@@ -1317,6 +1389,14 @@ export const MentorApp: React.FC = () => {
       {/* Modals */}
       {showCreateModal && (
         <CreateAssignmentModal onConfirm={handleCreateAssignmentConfirm} onCancel={() => setShowCreateModal(false)} />
+      )}
+      {groupSheet && (
+        <GroupSheet group={groupSheet.group} onClose={() => setGroupSheet(null)} onSaved={async saved => {
+          const fresh = await listGroups().catch(() => null);
+          if (fresh) setGroups(fresh);
+          setGroupRefresh(n => n + 1);
+          if (!groupSheet.group) { setNavGroupId(saved.id); setView("group"); }
+        }} />
       )}
       {showCreateGroupModal && (
         <SimpleInputModal title={t("app.modals.newGroupTitle")} placeholder={t("app.modals.newGroupPlaceholder")} confirmLabel={t("app.modals.newGroupConfirm")} onConfirm={handleCreateGroupConfirm} onCancel={() => setShowCreateGroupModal(false)} />

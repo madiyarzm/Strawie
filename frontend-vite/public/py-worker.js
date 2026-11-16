@@ -8,6 +8,10 @@
  * Protocol (postMessage):
  *   main → worker  {type: "init", ctrl, data, interrupt}   shared buffers (optional)
  *   main → worker  {type: "run", id, code, stdin: string[], interactive: bool}
+ *                  or {type: "run", id, cells: [{code, quiet, name}], ...}
+ *                  Cells share one namespace (notebook pages). Output of
+ *                  quiet cells is hidden; errors in any cell are shown and
+ *                  stop the run. `name` labels tracebacks ("block 3").
  *   worker → main  {type: "loading"} | {type: "ready"} | {type: "load_error", message}
  *   worker → main  {type: "stdout" | "stderr", id, text}
  *   worker → main  {type: "input_request", id}
@@ -50,6 +54,7 @@ let outputCapped = false;
 let stdinQueue = [];
 let interactive = false;
 let warnedNoInput = false;
+let quiet = false; // current cell's output is hidden
 const decoder = new TextDecoder();
 const lineDecoder = new TextDecoder();
 
@@ -92,7 +97,7 @@ async function load() {
 }
 
 function emit(type, text, length) {
-  if (outputCapped) return length;
+  if (outputCapped || quiet) return length;
   outputChars += text.length;
   if (outputChars > MAX_OUTPUT_CHARS) {
     outputCapped = true;
@@ -142,7 +147,9 @@ function cleanTraceback(message) {
   for (const line of String(message).split("\n")) {
     const frame = /^\s{2}File "([^"]*)"/.exec(line);
     if (frame) {
-      skipping = frame[1] !== "<exec>";
+      // Student code runs as "<exec>" or "<block N>"; everything else is
+      // Pyodide's own machinery.
+      skipping = !frame[1].startsWith("<");
       if (!skipping) out.push(line);
       continue;
     }
@@ -177,8 +184,18 @@ async function run(msg) {
   // Fresh variables for every run, like running a file with `python`.
   const ns = py.globals.get("dict")();
   ns.set("__name__", "__main__");
+  const cells = Array.isArray(msg.cells)
+    ? msg.cells.slice(0, 200).map((c) => ({ code: String(c.code || ""), quiet: !!c.quiet, name: String(c.name || "exec").slice(0, 40) }))
+    : [{ code: String(msg.code), quiet: false, name: "exec" }];
   try {
-    py.runPython(String(msg.code), { globals: ns });
+    for (const cell of cells) {
+      quiet = cell.quiet;
+      try {
+        py.runPython(cell.code, { globals: ns, filename: "<" + cell.name + ">" });
+      } finally {
+        quiet = false;
+      }
+    }
   } catch (err) {
     const type = err && err.type;
     if (type === "SystemExit") {
