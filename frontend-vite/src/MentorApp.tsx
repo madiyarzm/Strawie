@@ -921,7 +921,10 @@ export const MentorApp: React.FC = () => {
   };
 
   const isAdmin = user?.email === "madiyar.zmm@gmail.com";
-  const effectiveRole: "teacher" | "student" = (isAdmin && viewAsRole) ? viewAsRole : (user?.role || "student");
+  // Accounts stored with role "admin" use the teacher layout.
+  const effectiveRole: "teacher" | "student" = (isAdmin && viewAsRole)
+    ? viewAsRole
+    : (user?.role === "teacher" || user?.role === "admin" ? "teacher" : "student");
   const canCreate = effectiveRole === "teacher";
 
   // ── Demo overrides ────────────────────────────────────────────────────────
@@ -1299,10 +1302,12 @@ export const MentorApp: React.FC = () => {
         {/* Main content */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           {view === "home" && (
-            <HomeScreen user={user} role={effectiveRole} hasGroups={groups.length > 0} nav={lessonNav} />
+            <HomeScreen user={user} role={effectiveRole} hasGroups={groups.length > 0} nav={lessonNav}
+              teachingGroups={groups.filter((g: any) => g.teacher_id === user?.id || user?.role === "admin" || isAdmin)} />
           )}
           {view === "group" && navGroupId && (
             <GroupScreen key={navGroupId} groupId={navGroupId} nav={lessonNav} refreshKey={groupRefresh}
+              isTeacherOf={g => g.teacher_id === user?.id || user?.role === "admin" || isAdmin}
               onEditSchedule={g => setGroupSheet({ group: g })} />
           )}
           {view === "lesson" && navLessonId && (

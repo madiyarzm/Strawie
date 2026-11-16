@@ -66,7 +66,22 @@ function upcomingItems(agenda: Agenda, teacherOnly: boolean | null, days = 7): I
 
 // ── Home ──────────────────────────────────────────────────────────────────
 
-export const HomeScreen: React.FC<{ user: any; role: "teacher" | "student"; hasGroups: boolean; nav: Nav }> = ({ user, role, hasGroups, nav }) => {
+/** Start an ad-hoc lesson now (rounded to the minute, so a double click reuses it). */
+async function startNow(groupId: string): Promise<Lesson> {
+  const now = new Date();
+  now.setSeconds(0, 0);
+  const lesson = await lessonsApi.create(groupId, now.toISOString());
+  return lesson.live ? lesson : lessonsApi.update(lesson.id, { live: true });
+}
+
+export const HomeScreen: React.FC<{
+  user: any;
+  role: "teacher" | "student";
+  hasGroups: boolean;
+  /** Groups this user teaches (for "Start a lesson now"). */
+  teachingGroups?: { id: string; name: string }[];
+  nav: Nav;
+}> = ({ user, role, hasGroups, teachingGroups = [], nav }) => {
   const { t } = useTranslation();
   const { agenda, error } = useAgenda();
   const [busy, setBusy] = useState<string | null>(null);
@@ -165,9 +180,24 @@ export const HomeScreen: React.FC<{ user: any; role: "teacher" | "student"; hasG
           <div className="st-card ls-hero st-fade-up">
             <div className="ls-hero-body">
               <span className="st-chip"><Calendar className="h-3.5 w-3.5" />{t("lessons.home.noClasses", { defaultValue: "No classes this week" })}</span>
-              <h2>{t("lessons.home.freeWeek", { defaultValue: "Nothing scheduled" })}</h2>
-              <p>{teacher ? t("lessons.home.setSchedule", { defaultValue: "Set your groups' class days to see lessons here." }) : t("lessons.home.enjoy", { defaultValue: "Enjoy the break." })}</p>
+              <h2>{teacher ? t("lessons.home.startNowTitle", { defaultValue: "Start a lesson" }) : t("lessons.home.freeWeek", { defaultValue: "Nothing scheduled" })}</h2>
+              <p>{teacher ? t("lessons.home.startNowBody", { defaultValue: "Open a lesson page right now, or set class days so lessons appear here automatically." }) : t("lessons.home.enjoy", { defaultValue: "Enjoy the break." })}</p>
             </div>
+            {teacher && teachingGroups.length > 0 && (
+              <div className="ls-hero-actions" style={{ flexDirection: "column", alignItems: "stretch" }}>
+                {teachingGroups.slice(0, 4).map(g => (
+                  <div key={g.id} className="flex gap-2 items-center justify-end">
+                    <button type="button" className="st-btn st-btn-ghost st-btn-sm" onClick={() => nav.openGroup(g.id)}>{t("lessons.home.setDays", { defaultValue: "Set class days" })}</button>
+                    <button type="button" className="st-btn st-btn-primary" disabled={!!busy} onClick={async () => {
+                      setBusy(g.id);
+                      try { nav.openLesson((await startNow(g.id)).id); } finally { setBusy(null); }
+                    }}>
+                      {t("lessons.home.startIn", { defaultValue: "Start now · {{group}}", group: g.name })}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -238,7 +268,7 @@ export const HomeScreen: React.FC<{ user: any; role: "teacher" | "student"; hasG
 
 // ── Group ─────────────────────────────────────────────────────────────────
 
-export const GroupScreen: React.FC<{ groupId: string; nav: Nav; onEditSchedule: (g: Group) => void; refreshKey: number }> = ({ groupId, nav, onEditSchedule, refreshKey }) => {
+export const GroupScreen: React.FC<{ groupId: string; nav: Nav; onEditSchedule: (g: Group) => void; refreshKey: number; isTeacherOf: (g: Group) => boolean }> = ({ groupId, nav, onEditSchedule, refreshKey, isTeacherOf }) => {
   const { t } = useTranslation();
   const [group, setGroup] = useState<Group | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -267,7 +297,7 @@ export const GroupScreen: React.FC<{ groupId: string; nav: Nav; onEditSchedule: 
     return () => { cancelled = true; };
   }, [groupId, refreshKey]);
 
-  const teacher = lessons[0]?.is_teacher ?? slots[0]?.is_teacher ?? false;
+  const teacher = group ? isTeacherOf(group) : false;
   const upcoming: Item[] = [
     ...lessons.filter(l => l.live || new Date(l.starts_at).getTime() > now - 3 * 3_600_000).map(l => ({ kind: "lesson" as const, lesson: l, at: l.starts_at })),
     ...slots.map(s => ({ kind: "slot" as const, slot: s, at: s.starts_at })),
@@ -301,6 +331,13 @@ export const GroupScreen: React.FC<{ groupId: string; nav: Nav; onEditSchedule: 
               </button>
             )}
             <button type="button" className="st-btn st-btn-ghost" onClick={() => onEditSchedule(group)}>{t("lessons.group.editSchedule", { defaultValue: "Edit schedule" })}</button>
+            <button type="button" className="st-btn st-btn-primary" onClick={async () => {
+              const now = new Date();
+              now.setSeconds(0, 0);
+              nav.openLesson((await lessonsApi.create(group.id, now.toISOString())).id);
+            }}>
+              <Plus className="h-3.5 w-3.5" />{t("lessons.group.newLesson", { defaultValue: "New lesson" })}
+            </button>
           </div>
         )}
       </div>
@@ -308,7 +345,16 @@ export const GroupScreen: React.FC<{ groupId: string; nav: Nav; onEditSchedule: 
       <div className="ls-grid-2">
         <div className="st-card st-fade-up">
           <div className="ls-card-head"><h3>{t("lessons.group.comingUp", { defaultValue: "Coming up" })}</h3></div>
-          {upcoming.length === 0 && <p className="ls-card-empty">{teacher ? t("lessons.group.noUpcomingTeacher", { defaultValue: "Set class days to plan lessons." }) : t("lessons.group.noUpcoming", { defaultValue: "No upcoming classes." })}</p>}
+          {upcoming.length === 0 && (
+            <div className="ls-card-empty">
+              {teacher ? (
+                <span>
+                  {t("lessons.group.noUpcomingTeacher", { defaultValue: "Set class days to plan lessons." })}{" "}
+                  <button type="button" className="st-btn st-btn-ghost st-btn-sm" onClick={() => onEditSchedule(group)}>{t("lessons.group.editSchedule", { defaultValue: "Edit schedule" })}</button>
+                </span>
+              ) : t("lessons.group.noUpcoming", { defaultValue: "No upcoming classes." })}
+            </div>
+          )}
           {upcoming.map((it, i) => {
             const lesson = it.kind === "lesson" ? it.lesson : null;
             const title = lesson ? lessonTitle(lesson, t("lessons.untitled", { defaultValue: "Untitled lesson" })) : t("lessons.untitled", { defaultValue: "Untitled lesson" });
