@@ -155,6 +155,7 @@
     }
   },
   "app": {
+    "loadError": {"title": "Strawie couldn't load", "body": "The server had a problem. Try again in a moment.", "retry": "Try again"},
     "menu": { "language": "Language", "appearance": "Appearance", "light": "Light", "dark": "Dark" },
     "nav": {
       "dashboard": "Dashboard",
