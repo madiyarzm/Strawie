@@ -47,6 +47,12 @@ jobs:
 
       - run: uv pip install -r requirements.txt -r requirements-dev.txt --system
 
+      # Rebuild production's schema (revision 006) on the empty CI database,
+      # then upgrade -> downgrade -> upgrade. A broken migration blocks the
+      # deploy instead of failing at startup against the real database.
+      - name: Check database migrations
+        run: python scripts/check_migrations.py
+
       - name: Run tests
         run: pytest tests/ -x -q --tb=short
 
