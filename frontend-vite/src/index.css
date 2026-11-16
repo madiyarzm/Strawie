@@ -676,7 +676,8 @@ kbd.st-kbd {
 .ls-date.is-strong { background: var(--indigo); color: var(--on-primary); }
 .ls-date.is-strong span { color: inherit; opacity: 0.75; }
 .ls-empty { padding: 32px 24px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; }
-.ls-empty h2 { font-size: 18px; font-weight: 700; }
+.ls-empty h2 { font-size: 17px; font-weight: 700; }
+.ls-empty-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--bg-3); color: var(--text-3); }
 .ls-empty p { color: var(--text-3); max-width: 420px; font-size: 14px; }
 .ls-person { display: flex; align-items: center; gap: 10px; padding: 6px 16px; font-size: 13px; font-weight: 600; }
 .ls-person:last-child { padding-bottom: 16px; }

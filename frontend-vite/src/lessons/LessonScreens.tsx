@@ -353,7 +353,13 @@ export const ReviewScreen: React.FC<{ lessonId?: string; me: Me; onBack: () => v
         <div className="ls-head"><div><h1>{t("lessons.review.title", { defaultValue: "Review" })}</h1><p>{t("lessons.review.pick", { defaultValue: "Homework from your recent lessons." })}</p></div></div>
         <div className="st-card">
           {lessons === null && <p className="ls-card-empty">{t("common.loading")}</p>}
-          {lessons?.length === 0 && <p className="ls-card-empty">{t("lessons.review.none", { defaultValue: "No homework given in the last two weeks." })}</p>}
+          {lessons?.length === 0 && (
+            <div className="ls-empty">
+              <span className="ls-empty-icon"><Check className="h-5 w-5" /></span>
+              <h2>{t("lessons.review.noneTitle", { defaultValue: "Nothing to review" })}</h2>
+              <p>{t("lessons.review.none", { defaultValue: "No homework given in the last two weeks." })}</p>
+            </div>
+          )}
           {lessons?.map(l => (
             <button type="button" key={l.id} className="ls-row" onClick={() => onPick(l.id)}>
               <span className="ls-row-main"><b>{lessonTitle(l, t("lessons.untitled", { defaultValue: "Untitled lesson" }))}</b><span>{l.group_name} · {l.homework_due_at ? dateTime(l.homework_due_at) : ""}</span></span>
@@ -444,6 +450,36 @@ export const ReviewScreen: React.FC<{ lessonId?: string; me: Me; onBack: () => v
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+// ── Workspace (everyone) ──────────────────────────────────────────────────
+
+/** A private notebook page and whiteboard for trying things out. Only the
+ *  owner can open it (room "workspace:<user>"); it's saved on the server. */
+export const WorkspaceScreen: React.FC<{ me: Me; onBack: () => void }> = ({ me, onBack }) => {
+  const { t } = useTranslation();
+  const [surface, setSurface] = useState<"page" | "board">("page");
+  if (!me.id) return null;
+  return (
+    <div className="ls-work">
+      <header className="ls-topbar">
+        <button type="button" className="st-icon-btn" onClick={onBack} aria-label={t("common.back")}><ArrowLeft className="h-4 w-4" /></button>
+        <div className="ls-top-title"><h1>{t("lessons.workspace.title", { defaultValue: "My workspace" })}</h1></div>
+        <span className="ls-private"><Lock className="h-3.5 w-3.5" />{t("lessons.workspace.private", { defaultValue: "Only you can see this" })}</span>
+        <span className="ls-spacer" />
+        <Seg label={t("lessons.lesson.surface", { defaultValue: "Surface" })} value={surface} onChange={v => setSurface(v as "page" | "board")}
+          options={[{ id: "page", label: t("lessons.lesson.page", { defaultValue: "Page" }), icon: <FileText className="h-3.5 w-3.5" /> }, { id: "board", label: t("lessons.lesson.whiteboard", { defaultValue: "Whiteboard" }), icon: <PenLine className="h-3.5 w-3.5" /> }]} />
+      </header>
+      {surface === "board"
+        ? <div className="ls-board"><DrawingCanvas roomId={`workspace:${me.id}:draw`} userName={me.displayName} userRole={me.role} className="h-full" /></div>
+        : (
+          <div className="ls-canvas">
+            <p className="ls-note">{t("lessons.workspace.hint", { defaultValue: "Try ideas here. Everything is saved, and ▶ runs a block in your browser." })}</p>
+            <NotebookPage roomId={`workspace:${me.id}`} kind="board" userName={me.displayName} userRole={me.role} canEditText canEditStructure />
+          </div>
+        )}
     </div>
   );
 };
