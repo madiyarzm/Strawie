@@ -9,6 +9,7 @@ import secrets
 from typing import List
 from uuid import UUID
 
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.group import Group
@@ -88,17 +89,15 @@ def list_groups_for_user(db: Session, user: User) -> List[Group]:
     Returns:
         List of Group instances visible to this user.
     """
-    owned = db.query(Group).filter(Group.teacher_id == user.id)
-    member_of = (
+    # One query with OR instead of UNION: UNION compares whole rows to drop
+    # duplicates, and Postgres can't compare the JSON `schedule` column.
+    member_group_ids = select(GroupMembership.group_id).where(GroupMembership.user_id == user.id)
+    return (
         db.query(Group)
-        .join(GroupMembership, GroupMembership.group_id == Group.id)
-        .filter(GroupMembership.user_id == user.id)
+        .filter(or_(Group.teacher_id == user.id, Group.id.in_(member_group_ids)))
+        .order_by(Group.created_at)
+        .all()
     )
-
-    groups_by_id: dict[UUID, Group] = {}
-    for g in owned.union(member_of).all():
-        groups_by_id[g.id] = g
-    return list(groups_by_id.values())
 
 
 def get_member_count(db: Session, group_id: UUID) -> int:

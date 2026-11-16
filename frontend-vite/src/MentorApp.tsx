@@ -507,6 +507,8 @@ export const MentorApp: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [authChecked, setAuthChecked] = useState(false);
+  // Set when loading the app failed for a reason other than "not signed in".
+  const [initError, setInitError] = useState<string | null>(null);
   const [view, setView] = useState<View>("home");
   // New schedule-driven screens (src/lessons).
   const [navGroupId, setNavGroupId] = useState<string | null>(null);
@@ -638,8 +640,16 @@ export const MentorApp: React.FC = () => {
           } catch { /* invalid code: just land on home */ }
         }
         setAuthChecked(true);
-      } catch {
-        navigate("/", { replace: true });
+      } catch (e) {
+        // Only "not signed in" goes back to the landing page. Any other
+        // failure (server error, network) shows an error with a retry,
+        // otherwise landing (signed in → /app) and /app (error → landing)
+        // would bounce between each other forever.
+        if ((e as Error)?.message === "Unauthorized") {
+          navigate("/", { replace: true });
+        } else {
+          setInitError((e as Error)?.message || "Request failed");
+        }
       }
     };
     void init();
@@ -1034,6 +1044,19 @@ export const MentorApp: React.FC = () => {
     displayName: `${(isAdmin || effectiveRole === "teacher") ? t("common.teacher") : t("common.student")} ${(user?.name || "").split(" ")[0]}`.trim(),
     role: effectiveRole,
   };
+
+  if (initError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "var(--bg-2)" }}>
+        <div className="st-card" style={{ padding: 28, maxWidth: 420, textAlign: "center", display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+          <h1 style={{ fontSize: 18, fontWeight: 700 }}>{t("app.loadError.title", { defaultValue: "Strawie couldn't load" })}</h1>
+          <p style={{ fontSize: 14, color: "var(--text-3)" }}>{t("app.loadError.body", { defaultValue: "The server had a problem. Try again in a moment." })}</p>
+          <code style={{ fontSize: 12, color: "var(--text-3)" }}>{initError}</code>
+          <button type="button" className="st-btn st-btn-primary" onClick={() => window.location.reload()}>{t("app.loadError.retry", { defaultValue: "Try again" })}</button>
+        </div>
+      </div>
+    );
+  }
 
   if (!authChecked) {
     return (
