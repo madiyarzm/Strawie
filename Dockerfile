@@ -26,4 +26,4 @@ EXPOSE 8000
 # startup.py: stamps DB at head if no alembic_version exists, then runs upgrade head.
 # Uses ; (not &&) so uvicorn always starts even if the migration step errors.
 COPY startup.py ./
-CMD sh -c "python startup.py; uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"
+CMD sh -c "python startup.py; uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*' --ws-max-size 1048576"

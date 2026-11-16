@@ -367,6 +367,12 @@
       "unknownAssignment": "Неизвестное задание"
     },
     "assignment": {
+      "legacyDraftFound": "В этом браузере сохранена более старая копия этого кода, сделанная до автосохранения.",
+      "legacyDraftView": "Показать",
+      "legacyDraftTitle": "Старая копия из этого браузера",
+      "legacyDraftHint": "Скопируйте нужное в файл и скройте копию, когда закончите.",
+      "legacyDraftCopy": "Скопировать код",
+      "legacyDraftCopied": "Скопировано",
       "output": "Вывод",
       "running": "Выполняется",
       "back": "← Назад",

@@ -359,6 +359,12 @@
       "unknownAssignment": "Unknown assignment"
     },
     "assignment": {
+      "legacyDraftFound": "An older copy of this code is saved in this browser from before files were saved automatically.",
+      "legacyDraftView": "View it",
+      "legacyDraftTitle": "Older copy from this browser",
+      "legacyDraftHint": "Copy anything you need into the file. Dismiss it when you're done.",
+      "legacyDraftCopy": "Copy code",
+      "legacyDraftCopied": "Copied",
       "output": "Output",
       "running": "Running",
       "back": "← Back",

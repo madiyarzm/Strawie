@@ -567,6 +567,10 @@ export const MentorApp: React.FC = () => {
 
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [hint, setHint] = useState<string | null>(null);
+  // Code a student typed before rooms were saved on the server lived only in
+  // their browser (localStorage). Offer it once so nothing is lost; never
+  // written into the shared file automatically.
+  const [legacyDraft, setLegacyDraft] = useState<{ key: string; code: string } | null>(null);
   const [hintLoading, setHintLoading] = useState(false);
 
   const [viewAsRole, setViewAsRole] = useState<"teacher" | "student" | null>(null);
@@ -770,7 +774,8 @@ export const MentorApp: React.FC = () => {
     } catch (e: any) { setError(e.message || t("app.errors.createAssignment")); }
   };
 
-  const draftKey = (assignmentId: string) => `chalk:draft:${user?.id || "anon"}:${assignmentId}`;
+  // Pre-server-save drafts used this key. Only read now (see legacyDraft).
+  const legacyDraftKey = (assignmentId: string) => `chalk:draft:${user?.id || "anon"}:${assignmentId}`;
 
   const openAssignment = async (asg: any) => {
     setCurrentAssignment(asg);
@@ -789,24 +794,20 @@ export const MentorApp: React.FC = () => {
     }
     setSubmissions(subs);
 
-    // Restore code preference: localStorage draft > most-recent own submission > template.
-    // No role gate: the localStorage key is per-user-per-assignment, so saving
-    // teacher/admin drafts is safe and they want their work persisted too.
-    let restored = template;
+    // The file's content comes from the server (saved room, or starter code
+    // for a new one). The template is only shown until that arrives.
+    let legacy: { key: string; code: string } | null = null;
     try {
-      const draft = localStorage.getItem(draftKey(asg.id));
-      if (draft !== null && draft !== "") {
-        restored = draft;
-      } else {
-        const mine = subs.find((s: any) => s.user_id === user?.id);
-        if (mine?.code) restored = mine.code;
-      }
+      const key = legacyDraftKey(asg.id);
+      const draft = localStorage.getItem(key);
+      if (draft && draft.trim() && draft.trim() !== template.trim()) legacy = { key, code: draft };
     } catch { /* localStorage disabled (e.g. incognito) */ }
+    setLegacyDraft(legacy);
 
-    const initialFile: EditorFile = { id: asg.id || "main", name: defaultName, content: restored };
+    const initialFile: EditorFile = { id: asg.id || "main", name: defaultName, content: template };
     setFiles([initialFile]);
     setActiveFileId(initialFile.id);
-    setCode(restored);
+    setCode(template);
 
     if (effectiveRole === "teacher" && asg.due_at && currentClassroom?.group_id) {
       try {
@@ -855,12 +856,7 @@ export const MentorApp: React.FC = () => {
     setCode(value);
     if (!activeFileId) return;
     setFiles(prev => prev.map(f => f.id === activeFileId ? { ...f, content: value } : f));
-    // Persist drafts locally on every keystroke so navigating away and back
-    // (or hard refresh) keeps the code. Key is per-user-per-assignment, so
-    // it's safe for any role — teachers and admins benefit too.
-    if (currentAssignment?.id && user?.id) {
-      try { localStorage.setItem(draftKey(currentAssignment.id), value); } catch { /* quota / disabled */ }
-    }
+    // No local draft: the server saves the shared file (see collab_manager).
   };
 
   const handleSubmit = async (stdinLines: string[] = []) => {
@@ -1307,6 +1303,11 @@ export const MentorApp: React.FC = () => {
               hintLoading={hintLoading}
               onGetHint={handleGetHint}
               onDismissHint={() => setHint(null)}
+              legacyDraft={isWorkspaceView ? null : legacyDraft?.code ?? null}
+              onDismissLegacyDraft={() => {
+                if (legacyDraft) { try { localStorage.removeItem(legacyDraft.key); } catch { /* ignore */ } }
+                setLegacyDraft(null);
+              }}
               xp={xp}
             />
           )}
@@ -2749,6 +2750,8 @@ interface AssignmentViewProps {
   hintLoading: boolean;
   onGetHint: () => void;
   onDismissHint: () => void;
+  legacyDraft?: string | null;
+  onDismissLegacyDraft?: () => void;
   xp?: number | null;
 }
 
@@ -2761,12 +2764,15 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
   submissions, selectedSubmission, onSelectSubmission, loading,
   onSubmit, onBack, onSaveFeedback,
   failedAttempts, hint, hintLoading, onGetHint, onDismissHint, xp,
+  legacyDraft, onDismissLegacyDraft,
 }) => {
   const { t } = useTranslation();
   const [editorMode, setEditorMode] = useState<"code" | "draw">("code");
   const [handRaised, setHandRaised] = useState(false);
   const [rightOpen, setRightOpen] = useState(true);
   const [peers, setPeers] = useState<PeerInfo[]>([]);
+  const [showLegacy, setShowLegacy] = useState(false);
+  const [legacyCopied, setLegacyCopied] = useState(false);
   const isHomework = !!assignment.due_at;
 
   // Streaming terminal state
@@ -3084,6 +3090,16 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
       <div className="flex flex-1 min-h-0 gap-3 p-3">
         {/* ── Editor column ───────────────────────────────────────────── */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          {legacyDraft && (
+            <div
+              className="st-fade-up flex flex-wrap items-center gap-3 mb-3 px-4 py-2.5 rounded-[14px] text-[13px]"
+              style={{ background: "var(--amber-10)", border: "1px solid var(--amber-muted)", color: "var(--text-2)" }}
+            >
+              <span className="flex-1 min-w-[200px]">{t("app.assignment.legacyDraftFound")}</span>
+              <button type="button" className="st-btn st-btn-secondary st-btn-sm" onClick={() => setShowLegacy(true)}>{t("app.assignment.legacyDraftView")}</button>
+              <button type="button" className="st-btn st-btn-ghost st-btn-sm" onClick={onDismissLegacyDraft}>{t("app.assignment.dismiss")}</button>
+            </div>
+          )}
           <section className="st-card flex-1 min-h-0 flex flex-col overflow-hidden">
             {/* Toolbar: files on the left, actions on the right (code mode only —
                 the whiteboard carries its own floating toolbar) */}
@@ -3400,6 +3416,43 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
           </button>
         ))}
       </div>
+
+      {/* Older browser-only copy of this file */}
+      {showLegacy && legacyDraft && (
+        <div
+          className="st-backdrop"
+          onClick={() => setShowLegacy(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="st-pop-in"
+            role="dialog"
+            aria-label={t("app.assignment.legacyDraftTitle")}
+            style={{ width: "min(720px, 100%)", maxHeight: "85vh", display: "flex", flexDirection: "column", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 22, boxShadow: "var(--shadow-lg)", overflow: "hidden" }}
+          >
+            <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3">
+              <div>
+                <h2 className="text-[16px] font-semibold">{t("app.assignment.legacyDraftTitle")}</h2>
+                <p className="text-[12.5px]" style={{ color: "var(--text-3)" }}>{t("app.assignment.legacyDraftHint")}</p>
+              </div>
+              <button type="button" className="st-icon-btn" onClick={() => setShowLegacy(false)} aria-label={t("common.close")}><X className="h-4 w-4" /></button>
+            </div>
+            <pre className="mx-5 mb-4 p-4 rounded-[14px] overflow-auto text-[12.5px] leading-relaxed" style={{ background: "var(--bg-2)", border: "1px solid var(--border)", color: "var(--text)" }}>{legacyDraft}</pre>
+            <div className="flex justify-end gap-2 px-5 pb-5">
+              <button
+                type="button"
+                className="st-btn st-btn-primary"
+                onClick={() => {
+                  navigator.clipboard?.writeText(legacyDraft).then(() => setLegacyCopied(true), () => setLegacyCopied(false));
+                }}
+              >
+                {legacyCopied ? t("app.assignment.legacyDraftCopied") : t("app.assignment.legacyDraftCopy")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Submission detail modal */}
       {selectedSubmission && (

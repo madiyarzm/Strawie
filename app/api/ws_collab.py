@@ -1,9 +1,10 @@
 """
 WebSocket endpoint for collaborative editing (Yjs).
 
-The server acts as a simple relay: it forwards binary Yjs updates between all
-clients connected to the same room. Conflict resolution is handled on the
-client by Yjs/CRDT logic.
+The server relays binary Yjs updates between clients in the same room and
+keeps a copy of each room's document, which it saves to the database (see
+app/core/collab_manager.py and app/core/collab_store.py). Conflict
+resolution is CRDT logic; the server never executes document content.
 
 Authentication: clients must pass a valid JWT via the `token` query parameter.
 Authorisation: the room_id encodes a classroom + assignment; the user must
@@ -18,6 +19,7 @@ from jose import JWTError
 
 from app.config import get_settings
 from app.core.collab_manager import manager
+from app.core.collab_store import policy_for_room
 from app.core.demo_auth import DEMO_COOKIE_NAME, decode_guest_token
 from app.core.security import decode_access_token
 from app.core.ws_acl import (
@@ -77,10 +79,14 @@ async def collab_websocket(
     db = SessionLocal()
     try:
         allowed = user_can_join_room(db, user_id=user_id, room_id=room_id)
+        policy = policy_for_room(db, room_id) if allowed else None
     finally:
         db.close()
     if not allowed:
         await websocket.close(code=4403, reason="Not authorised for this room")
+        return
+    if policy is None:
+        await websocket.close(code=4400, reason="Unknown room")
         return
 
     room_key = _parse_room_id(room_id)
@@ -90,16 +96,9 @@ async def collab_websocket(
         uid_uuid = None
     classroom_id = room_key.classroom_id if room_key else None
 
-    await manager.connect(room_id, websocket, classroom_id=classroom_id, user_id=uid_uuid)
-    try:
-        while True:
-            data = await websocket.receive_bytes()
-            await manager.broadcast(room_id, data, sender=websocket)
-    except WebSocketDisconnect:
-        manager.disconnect(room_id, websocket)
-    except Exception as exc:
-        logger.warning("WebSocket error in room %s: %s", room_id, exc)
-        manager.disconnect(room_id, websocket)
+    if not await manager.connect(room_id, websocket, policy, classroom_id=classroom_id, user_id=uid_uuid):
+        return
+    await _pump(websocket, room_id)
 
 
 async def _handle_demo_room(websocket: WebSocket, room_id: str) -> None:
@@ -135,6 +134,7 @@ async def _handle_demo_room(websocket: WebSocket, room_id: str) -> None:
     db = SessionLocal()
     try:
         allowed = guest_can_join_demo_room(db, token_room_id=token_room_id, room_id=room_id)
+        policy = policy_for_room(db, room_id) if allowed else None
     except Exception as exc:
         logger.exception("Error authorising demo room %s: %s", room_id, exc)
         await websocket.close(code=4500, reason="Internal error")
@@ -152,13 +152,26 @@ async def _handle_demo_room(websocket: WebSocket, room_id: str) -> None:
     # classroom_id/user_id stay None: demo guests are deliberately absent from
     # the per-classroom presence map that powers the real "Live Now" UI, so a
     # visitor can never appear inside a real teacher's classroom.
-    await manager.connect(room_id, websocket)
+    if policy is None:
+        await websocket.close(code=4400, reason="Unknown room")
+        return
+    # Demo rooms are memory-only (policy.persist is False): anonymous
+    # visitors never write to the database.
+    if not await manager.connect(room_id, websocket, policy):
+        return
+    await _pump(websocket, room_id)
+
+
+async def _pump(websocket: WebSocket, room_id: str) -> None:
+    """Feed incoming messages to the room until the socket closes."""
     try:
         while True:
             data = await websocket.receive_bytes()
-            await manager.broadcast(room_id, data, sender=websocket)
+            if not await manager.handle_message(room_id, websocket, data):
+                break
     except WebSocketDisconnect:
-        manager.disconnect(room_id, websocket)
+        pass
     except Exception as exc:
-        logger.warning("Demo WebSocket error in room %s: %s", room_id, exc)
-        manager.disconnect(room_id, websocket)
+        logger.warning("WebSocket error in room %s: %s", room_id, exc)
+    finally:
+        await manager.disconnect(room_id, websocket)

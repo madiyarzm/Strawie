@@ -11,6 +11,7 @@ from app.db.session import Base, engine
 from app.models import (  # noqa: F401
     Assignment,
     Classroom,
+    CollabDocument,
     DemoRoom,
     Group,
     GroupMembership,

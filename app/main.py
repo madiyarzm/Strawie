@@ -71,6 +71,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     asyncio.create_task(_startup())
     yield
+    # Save every open live-editing room before the process exits.
+    from app.core.collab_manager import manager as collab_manager
+
+    try:
+        await collab_manager.flush_all()
+    except Exception as exc:
+        logger.error("Saving open rooms on shutdown failed: %s", exc)
 
 
 def create_app() -> FastAPI:

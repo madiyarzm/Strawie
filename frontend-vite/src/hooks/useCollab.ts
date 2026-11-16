@@ -24,6 +24,13 @@ export type PeerInfo = {
  */
 export type CollabStatus = "connecting" | "connected" | "reconnecting";
 
+/*
+ * The server keeps and saves every room's document, and fills a brand-new
+ * room with its starter code itself. So the client never seeds a shared
+ * room: it just applies whatever the server sends. `initialValue` is only
+ * used when there is no room (solo, offline editing).
+ */
+
 const TEACHER_COLOR = "#22c55e"; // green-500
 
 const STUDENT_COLORS = [
@@ -41,9 +48,11 @@ function pickStudentColor(clientId: number): string {
   return STUDENT_COLORS[clientId % STUDENT_COLORS.length];
 }
 
-// Wire tags: 0 = Yjs doc update, 1 = awareness update.
+// Wire tags: 0 = Yjs doc update, 1 = awareness update,
+// 2 = server finished sending the saved document ("synced").
 const TAG_DOC = 0;
 const TAG_AWARENESS = 1;
+const TAG_SYNCED = 2;
 
 /**
  * Yjs + Awareness WebSocket bridge for collaborative editing.
@@ -198,12 +207,11 @@ export function useCollab(
       { added, updated, removed }: { added: number[]; updated: number[]; removed: number[] },
     ) => {
       const changed = added.concat(updated, removed);
-      // When a new peer appears, also re-broadcast our own state so they see us.
-      // (The relay has no memory — late-joiners never see existing peers otherwise.)
+      // When a new peer appears, re-broadcast our own awareness so they see
+      // our cursor (awareness isn't stored on the server). The document
+      // itself comes from the server, so it isn't re-sent here.
       if (added.length > 0 && !changed.includes(doc.clientID)) {
         changed.push(doc.clientID);
-        // Also re-send full doc state so the late-joiner gets all edits so far.
-        taggedSend(TAG_DOC, Y.encodeStateAsUpdate(doc));
       }
       taggedSend(TAG_AWARENESS, encodeAwarenessUpdate(aw, changed));
     };
@@ -218,6 +226,16 @@ export function useCollab(
       } else if (tag === TAG_AWARENESS) {
         applyAwarenessUpdate(aw, payload, wsOrigin);
       }
+    };
+    // The synced marker is a single byte, so it's handled before the length
+    // check in handleMessage would drop it.
+    const handleRaw = (event: MessageEvent) => {
+      const raw = new Uint8Array(event.data as ArrayBuffer);
+      if (raw.length === 1 && raw[0] === TAG_SYNCED) {
+        setStatus("connected");
+        return;
+      }
+      handleMessage(event);
     };
 
     // Reconnect with exponential backoff (capped). Without this, a single
@@ -241,10 +259,10 @@ export function useCollab(
 
     const onOpen = () => {
       reconnectAttempts = 0;
-      setStatus("connected");
       // (Re)sync: push our full doc + awareness state. On a reconnect this
-      // replays any edits made while disconnected (Yjs/CRDT merges cleanly),
-      // and prompts peers to re-send their state when they see us reappear.
+      // replays any edits made while disconnected (Yjs/CRDT merges cleanly
+      // with the server's copy). On a first connect our doc is empty, so
+      // this is a no-op; the server's saved state arrives right after.
       taggedSend(TAG_DOC, Y.encodeStateAsUpdate(doc));
       taggedSend(TAG_AWARENESS, encodeAwarenessUpdate(aw, [doc.clientID]));
 
@@ -256,21 +274,6 @@ export function useCollab(
         }
       }, 10_000);
 
-      // Seed the room with our initialValue (template_code, draft, etc.) if
-      // ytext is still empty after a short grace period. Use deterministic
-      // leader election (smallest clientID wins) so two clients joining an
-      // empty room simultaneously don't both insert and duplicate content.
-      setTimeout(() => {
-        if (disposed) return;
-        const seed = initialValueRef.current;
-        if (ytext.length === 0 && seed) {
-          const peerIds = Array.from(aw.getStates().keys());
-          const minId = peerIds.length > 0 ? Math.min(...peerIds) : doc.clientID;
-          if (minId === doc.clientID) {
-            ytext.insert(0, seed);
-          }
-        }
-      }, 600);
     };
 
     const onClose = () => {
@@ -289,7 +292,7 @@ export function useCollab(
       s.binaryType = "arraybuffer";
       socket = s;
       s.addEventListener("open", onOpen);
-      s.addEventListener("message", handleMessage);
+      s.addEventListener("message", handleRaw);
       s.addEventListener("close", onClose);
       s.addEventListener("error", onError);
     }
@@ -308,7 +311,7 @@ export function useCollab(
       aw.off("change", onAwarenessChange);
       if (socket) {
         socket.removeEventListener("open", onOpen);
-        socket.removeEventListener("message", handleMessage);
+        socket.removeEventListener("message", handleRaw);
         socket.removeEventListener("close", onClose);
         socket.removeEventListener("error", onError);
         if (
