@@ -1,36 +1,16 @@
 /**
- * Pyodide-based Python runner. Executes student code in the browser's
- * WebAssembly sandbox instead of on the server.
+ * Runs student Python in the browser, inside a Web Worker (public/py-worker.js).
  *
- * Pyodide is loaded from CDN on first use (~10MB, cached by the browser).
- * stdin is fed from a pre-supplied queue of lines; once exhausted, input()
- * returns "" (empty line).
+ * Security model: the server never executes user code. Everything runs in
+ * the student's own tab, in Pyodide's WebAssembly sandbox, off the main
+ * thread. A runaway program is interrupted (Stop / timeout) and, if it
+ * doesn't stop, the whole worker is killed and replaced.
+ *
+ * Interactive input() and instant Stop need SharedArrayBuffer, which the
+ * browser only offers on cross-origin isolated pages (COOP/COEP headers set
+ * by the server and by the Vite dev server). Without isolation, programs
+ * still run; input() just receives end-of-input.
  */
-
-const PYODIDE_VERSION = "0.27.5";
-const PYODIDE_CDN = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
-
-// Subresource Integrity hash for the pyodide.js loader. The browser refuses
-// to execute the file if its actual SHA-384 doesn't match this string — so
-// a compromised CDN serving a malicious loader is blocked.
-//
-// Important caveats:
-//   * Pyodide's loader internally fetch()es pyodide.asm.wasm, .asm.js, and
-//     python_stdlib.zip. Those sub-fetches are NOT SRI-verified — Pyodide
-//     upstream doesn't ship a manifest. SRI here protects the entry point;
-//     full integrity requires self-hosting.
-//   * When bumping PYODIDE_VERSION above, you MUST regenerate this hash:
-//       curl -fsSL https://cdn.jsdelivr.net/pyodide/v<NEW>/full/pyodide.js \
-//         | openssl dgst -sha384 -binary | openssl base64 -A
-//     Otherwise the loader will fail to start and Pyodide won't work.
-const PYODIDE_INTEGRITY =
-  "sha384-rm4QcPMX69sqmX2kWiJa3BF02sgdJkVyATWkw5NHAxBUAvmLXhToWZYaP2wCcyEe";
-
-declare global {
-  interface Window {
-    loadPyodide?: (opts: { indexURL: string }) => Promise<any>;
-  }
-}
 
 export type RunOutput = { type: "stdout" | "stderr"; text: string };
 
@@ -47,15 +27,37 @@ export type SubmissionResult = RunResult & {
   test_output: string;
 };
 
-type ProgressEvent =
-  | { kind: "loading"; message: string }
-  | { kind: "ready" };
+export type RunHandle = {
+  /** Resolves when the program finishes, fails, is stopped, or times out. */
+  done: Promise<RunResult>;
+  /** Answer a pending input() call. `null` sends end-of-input. */
+  sendInput: (line: string | null) => void;
+  /** Stop the program (KeyboardInterrupt; the worker is killed if it doesn't stop). */
+  stop: () => void;
+};
 
+type StartOpts = {
+  code: string;
+  /** Lines fed to input() first, before asking the user. */
+  stdinLines?: string[];
+  /** When false, input() past `stdinLines` gets end-of-input instead of asking. */
+  interactive?: boolean;
+  onOutput?: (e: RunOutput) => void;
+  /** The program is waiting in input(); answer with handle.sendInput(). */
+  onInputRequest?: () => void;
+  /** Wall-clock limit, excluding time spent waiting for typed input. */
+  timeoutMs?: number;
+};
+
+type ProgressEvent = { kind: "loading"; message: string } | { kind: "ready" } | { kind: "failed"; message: string };
 type ProgressListener = (e: ProgressEvent) => void;
 
-let pyodidePromise: Promise<any> | null = null;
-const progressListeners = new Set<ProgressListener>();
+const WORKER_URL = "/py-worker.js";
+const INPUT_BYTES = 64 * 1024;
+/** How long a stopped program gets to unwind before its worker is killed. */
+const STOP_GRACE_MS = 800;
 
+const progressListeners = new Set<ProgressListener>();
 function emitProgress(e: ProgressEvent): void {
   for (const fn of progressListeners) fn(e);
 }
@@ -65,207 +67,268 @@ export function onPyodideProgress(listener: ProgressListener): () => void {
   return () => progressListeners.delete(listener);
 }
 
-export function isPyodideReady(): boolean {
-  return pyodidePromise !== null && (pyodidePromise as any)._resolved === true;
+/** True when typed input() and instant Stop are available on this page. */
+export function isInteractiveInputSupported(): boolean {
+  return typeof SharedArrayBuffer !== "undefined" && (globalThis as { crossOriginIsolated?: boolean }).crossOriginIsolated === true;
 }
 
-function loadScript(src: string, integrity?: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${src}"]`);
-    if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Failed to load Pyodide")));
-      // If already loaded:
-      if ((existing as HTMLScriptElement).dataset.loaded === "true") resolve();
+// ── Worker lifecycle ──────────────────────────────────────────────────────
+
+type Shared = { ctrl: Int32Array; data: Uint8Array; interrupt: Uint8Array } | null;
+
+type ActiveRun = {
+  id: number;
+  stdout: string[];
+  stderr: string[];
+  opts: StartOpts;
+  awaitingInput: boolean;
+  settled: boolean;
+  resolve: (r: RunResult) => void;
+  startedAt: number;
+  killTimer: ReturnType<typeof setTimeout> | null;
+  timeoutTimer: ReturnType<typeof setTimeout> | null;
+  timedOut: boolean;
+};
+
+let worker: Worker | null = null;
+let shared: Shared = null;
+let ready = false;
+let nextRunId = 1;
+let active: ActiveRun | null = null;
+
+function spawnWorker(): Worker {
+  const w = new Worker(WORKER_URL);
+  ready = false;
+  shared = null;
+  const init: Record<string, unknown> = { type: "init" };
+  if (isInteractiveInputSupported()) {
+    const ctrlBuf = new SharedArrayBuffer(8);
+    const dataBuf = new SharedArrayBuffer(INPUT_BYTES);
+    const intBuf = new SharedArrayBuffer(1);
+    shared = { ctrl: new Int32Array(ctrlBuf), data: new Uint8Array(dataBuf), interrupt: new Uint8Array(intBuf) };
+    init.ctrl = ctrlBuf;
+    init.data = dataBuf;
+    init.interrupt = intBuf;
+  }
+  w.onmessage = (ev: MessageEvent) => handleMessage(w, ev.data);
+  w.onerror = () => {
+    if (worker !== w) return;
+    emitProgress({ kind: "failed", message: "The Python runtime stopped unexpectedly." });
+    finishActive({ status: "error", exit_code: 1 }, "\n[The Python runtime stopped unexpectedly.]\n");
+    killWorker();
+  };
+  w.postMessage(init);
+  return w;
+}
+
+function getWorker(): Worker {
+  if (!worker) worker = spawnWorker();
+  return worker;
+}
+
+function killWorker(): void {
+  if (worker) worker.terminate();
+  worker = null;
+  ready = false;
+  shared = null;
+}
+
+function handleMessage(from: Worker, msg: any): void {
+  if (from !== worker || !msg) return;
+  switch (msg.type) {
+    case "loading":
+      emitProgress({ kind: "loading", message: "Loading Python…" });
       return;
-    }
-    const s = document.createElement("script");
-    s.src = src;
-    s.async = true;
-    // SRI: browser refuses to execute the script if its hash doesn't match
-    // `integrity`. `crossOrigin="anonymous"` is required for SRI on
-    // cross-origin scripts — without it the browser can't read the body
-    // to verify the hash.
-    if (integrity) {
-      s.integrity = integrity;
-      s.crossOrigin = "anonymous";
-    }
-    s.onload = () => {
-      s.dataset.loaded = "true";
-      resolve();
-    };
-    s.onerror = () => reject(new Error("Failed to load Pyodide (integrity check or network)"));
-    document.head.appendChild(s);
+    case "ready":
+      ready = true;
+      emitProgress({ kind: "ready" });
+      return;
+    case "load_error":
+      emitProgress({ kind: "failed", message: msg.message });
+      return;
+  }
+  const run = active;
+  if (!run || msg.id !== run.id || run.settled) return;
+  if (msg.type === "stdout" || msg.type === "stderr") {
+    (msg.type === "stdout" ? run.stdout : run.stderr).push(msg.text);
+    run.opts.onOutput?.({ type: msg.type, text: msg.text });
+  } else if (msg.type === "input_request") {
+    run.awaitingInput = true;
+    pauseTimeout(run);
+    run.opts.onInputRequest?.();
+  } else if (msg.type === "done") {
+    finishActive({ status: run.timedOut ? "timeout" : msg.status, exit_code: msg.exit_code, elapsed: msg.elapsed });
+  }
+}
+
+function finishActive(r: { status: RunResult["status"]; exit_code: number; elapsed?: number }, note?: string): void {
+  const run = active;
+  if (!run || run.settled) return;
+  run.settled = true;
+  if (run.killTimer) clearTimeout(run.killTimer);
+  if (run.timeoutTimer) clearTimeout(run.timeoutTimer);
+  if (note) {
+    run.stderr.push(note);
+    run.opts.onOutput?.({ type: "stderr", text: note });
+  }
+  active = null;
+  run.resolve({
+    status: r.status,
+    stdout: run.stdout.join(""),
+    stderr: run.stderr.join(""),
+    exit_code: r.exit_code,
+    elapsed: r.elapsed ?? Math.round(performance.now() - run.startedAt) / 1000,
   });
 }
 
-async function loadPyodideOnce(): Promise<any> {
-  if (pyodidePromise) return pyodidePromise;
-  emitProgress({ kind: "loading", message: "Loading Python runtime…" });
-  pyodidePromise = (async () => {
-    await loadScript(`${PYODIDE_CDN}pyodide.js`, PYODIDE_INTEGRITY);
-    if (!window.loadPyodide) throw new Error("Pyodide failed to expose loadPyodide");
-    const py = await window.loadPyodide({ indexURL: PYODIDE_CDN });
-    (pyodidePromise as any)._resolved = true;
-    emitProgress({ kind: "ready" });
-    return py;
-  })();
-  return pyodidePromise;
+function armTimeout(run: ActiveRun): void {
+  const ms = run.opts.timeoutMs;
+  if (!ms || run.timeoutTimer) return;
+  run.timeoutTimer = setTimeout(() => {
+    run.timeoutTimer = null;
+    run.timedOut = true;
+    stopRun(run, "\n[Time limit reached. The program was stopped.]\n");
+  }, ms);
 }
 
-/** Eagerly trigger Pyodide download. Safe to call multiple times. */
+function pauseTimeout(run: ActiveRun): void {
+  if (run.timeoutTimer) clearTimeout(run.timeoutTimer);
+  run.timeoutTimer = null;
+}
+
+function stopRun(run: ActiveRun, note: string): void {
+  if (run.settled) return;
+  if (note) {
+    run.stderr.push(note);
+    run.opts.onOutput?.({ type: "stderr", text: note });
+  }
+  const sh = shared;
+  if (sh) {
+    // Ask Python to raise KeyboardInterrupt, and release a pending input().
+    sh.interrupt[0] = 2;
+    Atomics.store(sh.ctrl, 0, 2);
+    Atomics.notify(sh.ctrl, 0);
+    run.killTimer = setTimeout(() => hardKill(run), STOP_GRACE_MS);
+  } else {
+    hardKill(run);
+  }
+}
+
+function hardKill(run: ActiveRun): void {
+  if (run.settled) return;
+  killWorker();
+  finishActive({ status: run.timedOut ? "timeout" : "error", exit_code: 130 });
+  // Start a fresh runtime in the background so the next Run is quick.
+  getWorker();
+}
+
+/** Start running `code`. Any program still running is stopped first. */
+export function startRun(opts: StartOpts): RunHandle {
+  if (active) {
+    const prev = active;
+    stopRun(prev, "");
+    hardKill(prev);
+  }
+  const w = getWorker();
+  const id = nextRunId++;
+  let resolve!: (r: RunResult) => void;
+  const done = new Promise<RunResult>((r) => { resolve = r; });
+  const run: ActiveRun = {
+    id, stdout: [], stderr: [], opts, awaitingInput: false, settled: false,
+    resolve, startedAt: performance.now(), killTimer: null, timeoutTimer: null, timedOut: false,
+  };
+  active = run;
+  armTimeout(run);
+  w.postMessage({ type: "run", id, code: opts.code, stdin: opts.stdinLines ?? [], interactive: opts.interactive !== false });
+
+  const encoder = new TextEncoder();
+  return {
+    done,
+    sendInput: (line) => {
+      if (run.settled || !run.awaitingInput) return;
+      const sh = shared;
+      if (!sh) return;
+      run.awaitingInput = false;
+      if (line === null) {
+        Atomics.store(sh.ctrl, 0, 2);
+      } else {
+        const bytes = encoder.encode(line).subarray(0, sh.data.length);
+        sh.data.set(bytes);
+        Atomics.store(sh.ctrl, 1, bytes.length);
+        Atomics.store(sh.ctrl, 0, 1);
+      }
+      Atomics.notify(sh.ctrl, 0);
+      armTimeout(run);
+    },
+    stop: () => stopRun(run, ""),
+  };
+}
+
+// ── Convenience wrappers (kept compatible with earlier callers) ───────────
+
+/** Eagerly download and start the Python runtime. Safe to call repeatedly. */
 export function warmupPyodide(): void {
-  void loadPyodideOnce();
+  getWorker();
 }
 
-type RunOpts = {
+export function isPyodideReady(): boolean {
+  return ready;
+}
+
+type InteractiveOpts = {
   code: string;
   stdinLines?: string[];
   onOutput?: (e: RunOutput) => void;
-  /** Hard wall-clock timeout in ms. Default 10s. */
   timeoutMs?: number;
   /**
-   * Called when the program hits `input()` and the pre-supplied `stdinLines`
-   * queue is empty. Must return the line SYNCHRONOUSLY, because CPython's
-   * `input()` is a blocking call and Pyodide runs on the main thread -- there
-   * is no point at which we could await a promise and resume the interpreter.
-   *
-   * A synchronous `window.prompt()` is the one browser API that satisfies
-   * this. Returning null means "no more input", which Python sees as EOF.
-   *
-   * (The alternative -- Pyodide in a worker with SharedArrayBuffer and
-   * Atomics.wait -- gives in-page input but needs cross-origin isolation,
-   * which conflicts with loading Pyodide from the CDN.)
+   * Answer an input() call synchronously (e.g. with window.prompt). Return
+   * null for end of input. The answer is echoed into the output.
    */
   onStdinRequest?: (promptText: string) => string | null;
 };
 
-async function runWithIO(opts: RunOpts): Promise<RunResult> {
-  const py = await loadPyodideOnce();
-  const start = performance.now();
-
-  const stdoutBuf: string[] = [];
-  const stderrBuf: string[] = [];
-  const queue = [...(opts.stdinLines ?? [])];
-
-  // Pyodide writes the `input()` prompt to stdout just before reading stdin,
-  // so the most recent stdout chunk is our best guess at the prompt text.
-  // Declared before setStdout because that callback closes over it.
-  // Note: `batched` only flushes on a newline, and a prompt like
-  // "Name? " has none -- so this can legitimately still be empty when
-  // stdin is read. Callers must cope with an empty promptText.
-  let lastStdoutChunk = "";
-
-  py.setStdout({
-    batched: (s: string) => {
-      lastStdoutChunk = s;
-      stdoutBuf.push(s + "\n");
-      opts.onOutput?.({ type: "stdout", text: s + "\n" });
+/** Run to completion, answering input() through `onStdinRequest`. */
+export function runInteractive(opts: InteractiveOpts): Promise<RunResult> {
+  let lastStdout = "";
+  const handle = startRun({
+    code: opts.code,
+    stdinLines: opts.stdinLines,
+    interactive: !!opts.onStdinRequest,
+    timeoutMs: opts.timeoutMs,
+    onOutput: (e) => {
+      if (e.type === "stdout") lastStdout = e.text;
+      opts.onOutput?.(e);
+    },
+    onInputRequest: () => {
+      const answer = opts.onStdinRequest ? opts.onStdinRequest(lastStdout.trim()) : null;
+      if (answer !== null) opts.onOutput?.({ type: "stdout", text: answer + "\n" });
+      handle.sendInput(answer);
     },
   });
-  py.setStderr({
-    batched: (s: string) => {
-      stderrBuf.push(s + "\n");
-      opts.onOutput?.({ type: "stderr", text: s + "\n" });
-    },
-  });
-  py.setStdin({
-    stdin: (): string | null => {
-      // One call of this callback must supply exactly one line.
-      //
-      // This relies on `autoEOF: true` below. With autoEOF disabled, Pyodide
-      // keeps calling back until its 2048-byte buffer fills -- a newline does
-      // NOT end the read -- so an interactive handler would open 2048 prompts
-      // for a single `input()`. autoEOF inserts the EOF that terminates each
-      // read, so one callback return answers one `input()`.
-      //
-      // Returning "" means end of input.
-      if (queue.length > 0) {
-        return queue.shift() as string;
-      }
-
-      // No queued input and no interactive handler: signal EOF rather than
-      // hanging, which is what callers passing a finite stdinLines expect.
-      if (!opts.onStdinRequest) {
-        return "";
-      }
-
-      const answer = opts.onStdinRequest(lastStdoutChunk.trim());
-      // The user cancelled the prompt. Returning null is EOF, so `input()`
-      // raises EOFError and the program ends instead of prompting forever.
-      if (answer === null) {
-        return null;
-      }
-      // Echo the typed line into the transcript, otherwise the output reads
-      // as if the prompt answered itself.
-      opts.onOutput?.({ type: "stdout", text: answer + "\n" });
-      return answer;
-    },
-    // See the note above: this must stay true or interactive input loops.
-    autoEOF: true,
-  });
-
-  // Watchdog: Pyodide on main thread can't be killed mid-execution, but we
-  // can at least report timeout to the caller.
-  const timeoutMs = opts.timeoutMs ?? 10_000;
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    py.checkInterrupt?.();
-  }, timeoutMs);
-
-  let status: RunResult["status"] = "success";
-  let exitCode = 0;
-  try {
-    await py.runPythonAsync(opts.code);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    stderrBuf.push(msg + "\n");
-    opts.onOutput?.({ type: "stderr", text: msg + "\n" });
-    status = timedOut ? "timeout" : "error";
-    exitCode = 1;
-  } finally {
-    clearTimeout(timer);
-  }
-
-  return {
-    status,
-    stdout: stdoutBuf.join(""),
-    stderr: stderrBuf.join(""),
-    exit_code: exitCode,
-    elapsed: parseFloat(((performance.now() - start) / 1000).toFixed(2)),
-  };
-}
-
-export function runInteractive(opts: RunOpts): Promise<RunResult> {
-  return runWithIO(opts);
+  return handle.done;
 }
 
 /**
- * Run student code, then the assignment's test_code (if present) appended
- * to the student code, in a fresh interpreter scope. Returns one result
- * for the student run plus test_passed/test_output for grading.
+ * Run student code, then (if present) the assignment's tests appended to it,
+ * each in a fresh namespace with a 10s limit. input() is fed from
+ * `stdinLines` only. Grading happens here in the browser; the server just
+ * stores the result.
  */
 export async function runForSubmission(
   code: string,
   testCode: string | null | undefined,
   stdinLines: string[] = [],
 ): Promise<SubmissionResult> {
-  const studentRun = await runWithIO({ code, stdinLines });
+  const studentRun = await startRun({ code, stdinLines, interactive: false, timeoutMs: 10_000 }).done;
 
   let test_passed: boolean | null = null;
   let test_output = "";
-
   if (testCode && testCode.trim()) {
     const combined = code + "\n\n# === auto-grader ===\n" + testCode;
-    const testRun = await runWithIO({ code: combined, stdinLines });
+    const testRun = await startRun({ code: combined, stdinLines, interactive: false, timeoutMs: 10_000 }).done;
     test_passed = testRun.status === "success";
     test_output = (testRun.stdout || "") + (testRun.stderr || "");
   }
 
-  return {
-    ...studentRun,
-    test_passed,
-    test_output,
-  };
+  return { ...studentRun, test_passed, test_output };
 }

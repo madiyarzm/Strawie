@@ -9,9 +9,8 @@
  *   * A reviewer spends 60-120 seconds here, so there must be no empty state,
  *     no dead button, and no unexplained failure. Every error path below ends
  *     in a readable sentence plus an action.
- *   * Python runs ENTIRELY in the browser via Pyodide. Guests are refused by
- *     the server-side sandbox on purpose (app/api/ws_sandbox.py), so there is
- *     no server execution path to fall back to and none is attempted.
+ *   * Python runs ENTIRELY in the browser via Pyodide (public/py-worker.js).
+ *     The server has no code execution path for anyone, guests included.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";

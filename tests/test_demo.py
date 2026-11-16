@@ -231,7 +231,7 @@ def test_guest_token_expires(fresh_room, settings):
         ("get", "/api/v1/classrooms"),
         ("get", "/api/v1/submissions"),
         ("get", "/api/v1/admin/users"),
-        ("post", "/api/v1/sandbox/run"),
+        ("post", "/api/v1/submissions/"),
     ],
 )
 def test_guest_token_cannot_reach_authenticated_routes(

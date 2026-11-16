@@ -397,8 +397,6 @@
       "clear": "Clear",
       "terminalEmpty": "Run your code to see output here...",
       "runSeparator": "── Run {{n}} ──",
-      "runConnectionFailed": "Could not open a run connection.",
-      "runConnectionError": "Run connection error.",
       "roster": "Roster",
       "submissionsPanel": "Submissions",
       "collapse": "Collapse",

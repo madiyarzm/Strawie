@@ -52,24 +52,6 @@ class Settings(BaseSettings):
         description="Email of the admin/owner account. Auto-assigned teacher role on first login.",
     )
 
-    # Sandbox: real code execution (subprocess by default; Docker optional)
-    sandbox_timeout_seconds: int = Field(
-        default=10,
-        description="Max execution time per run. Prevents runaway code.",
-    )
-    sandbox_max_output_bytes: int = Field(
-        default=256 * 1024,
-        description="Max stdout+stderr bytes to capture before truncation.",
-    )
-    sandbox_use_docker: bool = Field(
-        default=False,
-        description="Use Docker executor when True and Docker available; else subprocess.",
-    )
-    sandbox_docker_image: str = Field(
-        default="lambda-sandbox:latest",
-        description="Docker image for sandbox (e.g. built from docker/sandbox.Dockerfile).",
-    )
-
     # Public demo rooms ("Try demo" — no signup). Guests are a restricted role
     # enforced in app/dependencies.py and app/core/ws_acl.py.
     demo_enabled: bool = Field(

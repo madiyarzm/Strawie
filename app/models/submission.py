@@ -1,7 +1,7 @@
 """
 Submission model: one run of student code for an assignment.
 
-Status and result_json are set after sandbox execution.
+Status and result_json come from the run in the student's browser.
 """
 
 import uuid

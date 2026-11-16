@@ -7,9 +7,8 @@ handler here assumes a hostile caller:
   * Room creation is rate limited twice -- by slowapi per IP per hour, and by
     a database-backed per-IP count that survives container restarts.
   * Nothing here reads or writes the users/groups/classrooms graph.
-  * No server-side code execution is offered to guests at all; the demo runs
-    Python in the visitor's browser via Pyodide. See app/api/ws_sandbox.py,
-    which explicitly refuses guest tokens.
+  * The server never executes code for anyone; the demo runs Python in the
+    visitor's browser via Pyodide (frontend-vite/public/py-worker.js).
   * Every rejection returns an explicit message, never a silent failure.
 """
 

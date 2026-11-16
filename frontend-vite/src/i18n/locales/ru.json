@@ -405,8 +405,6 @@
       "clear": "Очистить",
       "terminalEmpty": "Запустите код, чтобы увидеть вывод здесь...",
       "runSeparator": "── Запуск {{n}} ──",
-      "runConnectionFailed": "Не удалось открыть соединение для запуска.",
-      "runConnectionError": "Ошибка соединения при запуске.",
       "roster": "Список",
       "submissionsPanel": "Отправки",
       "collapse": "Свернуть",
