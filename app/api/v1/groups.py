@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from app.core.limiter import limiter, user_or_ip
 from app.dependencies import CurrentUser, DBSession
 from app.models.group_membership import GroupMembership
-from app.schemas.group import GroupCreate, GroupMemberRead, GroupRead, JoinGroupRequest
+from app.schemas.group import GroupCreate, GroupMemberRead, GroupRead, GroupUpdate, JoinGroupRequest
 from app.services.group_service import (
     create_group,
     delete_group,
@@ -50,8 +50,33 @@ def create_group_endpoint(
     if current_user.role != "teacher":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only teachers can create groups")
 
-    group = create_group(db, teacher=current_user, name=payload.name, description=payload.description)
+    group = create_group(
+        db,
+        teacher=current_user,
+        name=payload.name,
+        description=payload.description,
+        schedule=payload.schedule.model_dump() if payload.schedule else None,
+    )
     return _group_to_read(group, 0)
+
+
+@router.patch("/{group_id}", response_model=GroupRead)
+def update_group(group_id: UUID, payload: GroupUpdate, current_user: CurrentUser, db: DBSession) -> GroupRead:
+    """Rename a group or change its schedule. Only the group's teacher."""
+    try:
+        group = get_group_or_404(db, group_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    if group.teacher_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the group's teacher can change it")
+    changes = payload.model_dump(exclude_unset=True)
+    if "name" in changes and changes["name"]:
+        group.name = changes["name"]
+    if "schedule" in changes:
+        group.schedule = changes["schedule"]
+    db.commit()
+    db.refresh(group)
+    return _group_to_read(group, get_member_count(db, group.id))
 
 
 @router.get("/{group_id}", response_model=GroupRead)

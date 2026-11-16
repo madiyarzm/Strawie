@@ -21,7 +21,9 @@ def _generate_invite_code() -> str:
     return secrets.token_urlsafe(6)
 
 
-def create_group(db: Session, teacher: User, name: str, description: str | None) -> Group:
+def create_group(
+    db: Session, teacher: User, name: str, description: str | None, schedule: dict | None = None
+) -> Group:
     """
     Create a new group owned by the given teacher.
 
@@ -33,6 +35,7 @@ def create_group(db: Session, teacher: User, name: str, description: str | None)
         name=name,
         description=description,
         invite_code=_generate_invite_code(),
+        schedule=schedule,
     )
     db.add(group)
     db.commit()

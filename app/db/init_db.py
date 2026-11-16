@@ -15,6 +15,8 @@ from app.models import (  # noqa: F401
     DemoRoom,
     Group,
     GroupMembership,
+    HomeworkSubmission,
+    Lesson,
     Submission,
     User,
 )

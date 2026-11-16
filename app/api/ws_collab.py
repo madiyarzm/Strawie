@@ -94,9 +94,11 @@ async def collab_websocket(
         uid_uuid = uuid.UUID(user_id)
     except (ValueError, TypeError):
         uid_uuid = None
-    classroom_id = room_key.classroom_id if room_key else None
+    # Presence ("who's here") is grouped per classroom for older rooms and
+    # per lesson for lesson rooms.
+    presence_key = policy.lesson_id or (room_key.classroom_id if room_key else None)
 
-    if not await manager.connect(room_id, websocket, policy, classroom_id=classroom_id, user_id=uid_uuid):
+    if not await manager.connect(room_id, websocket, policy, classroom_id=presence_key, user_id=uid_uuid):
         return
     await _pump(websocket, room_id)
 

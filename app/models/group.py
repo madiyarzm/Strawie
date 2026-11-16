@@ -9,7 +9,7 @@ within it.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -30,6 +30,9 @@ class Group(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     invite_code: Mapped[str | None] = mapped_column(String(32), unique=True, nullable=True, index=True)
+    # Weekly class times: {"days": [1, 3], "time": "17:00", "tz": "Asia/Almaty"}.
+    # days: 0 = Monday ... 6 = Sunday. Null = no fixed schedule.
+    schedule: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

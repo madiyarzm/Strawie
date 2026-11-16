@@ -96,6 +96,19 @@ class CollabRoomManager:
         finally:
             db.close()
 
+    def _load_source_blocking(self, room_id: str) -> Doc:
+        db = self._session_factory()
+        try:
+            return collab_store.load_source_doc(db, room_id)
+        finally:
+            db.close()
+
+    async def _source_doc(self, room_id: str) -> Doc:
+        live = self._rooms.get(room_id)
+        if live is not None and live.doc is not None:
+            return live.doc
+        return await asyncio.to_thread(self._load_source_blocking, room_id)
+
     def _save_blocking(self, room_id: str, policy: RoomPolicy, state: bytes) -> None:
         db = self._session_factory()
         try:
@@ -141,6 +154,13 @@ class CollabRoomManager:
                             logger.error("Saved state for room %s is unreadable: %s", room_id, exc)
                             await websocket.close(code=4500, reason="This file could not be opened.")
                             return False
+                    elif policy.seed_from is not None and policy.transform is not None:
+                        # A personal copy (solo page, student homework) is
+                        # built once from its source: the live in-memory
+                        # version if that room is open, else the saved one.
+                        source = await self._source_doc(policy.seed_from)
+                        policy.transform(source, doc)
+                        room.dirty = policy.persist
                     elif policy.seed is not None:
                         policy.seed(doc)
                         # Save the seeded state right away. Otherwise a server
@@ -284,6 +304,11 @@ class CollabRoomManager:
             if room.save_task and not room.save_task.done():
                 room.save_task.cancel()
             await self._flush(room_id, room)
+
+    def open_doc(self, room_id: str) -> Optional[Doc]:
+        """The live document of an open room (read on the event loop only)."""
+        room = self._rooms.get(room_id)
+        return room.doc if room is not None else None
 
     # ── presence ───────────────────────────────────────────────────────────
 

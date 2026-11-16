@@ -82,12 +82,20 @@ def user_can_join_room(db: Session, user_id: str, room_id: str) -> bool:
     valid (classroom, assignment) pair can't be spoofed.
     """
     uid = _parse_uuid(user_id)
-    key = _parse_room_id(room_id)
-    if not uid or not key:
+    if not uid:
+        return False
+    user = db.get(User, uid)
+    if not user or getattr(user, "is_banned", False):
         return False
 
-    user = db.get(User, uid)
-    if not user:
+    from app.core.lesson_rooms import parse_lesson_room, user_can_join_lesson_room
+
+    lesson_room = parse_lesson_room(room_id)
+    if lesson_room is not None:
+        return user_can_join_lesson_room(db, user, lesson_room)
+
+    key = _parse_room_id(room_id)
+    if not key:
         return False
     if user.role == "admin":
         return True
