@@ -601,6 +601,7 @@
     },
     "submittedOf": "{{n}}/{{total}} submitted",
     "group": {
+      "newLesson": "New lesson",
       "noStudents": "No students yet. Share the invite link.",
       "noSchedule": "No fixed schedule",
       "copied": "Link copied",
@@ -634,6 +635,10 @@
     },
     "notStarted": "Not submitted",
     "home": {
+      "startNowTitle": "Start a lesson",
+      "startNowBody": "Open a lesson page right now, or set class days so lessons appear here automatically.",
+      "setDays": "Set class days",
+      "startIn": "Start now · {{group}}",
       "nothingSoon": "No classes in the next week.",
       "liveNow": "{{group}} is live right now.",
       "classStarted": "Class time started {{when}}.",
