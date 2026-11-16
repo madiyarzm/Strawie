@@ -144,7 +144,7 @@
     "rolePick": {
       "welcome": "Welcome.",
       "welcomeNamed": "Welcome, {{name}}.",
-      "subtitle": "Pick how you'll use Lambda. This choice is permanent.",
+      "subtitle": "Pick how you'll use Strawie. This choice is permanent.",
       "teacherTitle": "I'm a teacher",
       "teacherDesc": "Create your own groups, classrooms, and assignments. Invite students with a code. You manage your own bubble — no other teachers see it.",
       "studentTitle": "I'm a student",
@@ -155,6 +155,7 @@
     }
   },
   "app": {
+    "menu": { "language": "Language", "appearance": "Appearance", "light": "Light", "dark": "Dark" },
     "nav": {
       "dashboard": "Dashboard",
       "classroom": "Classroom",
@@ -358,6 +359,8 @@
       "unknownAssignment": "Unknown assignment"
     },
     "assignment": {
+      "output": "Output",
+      "running": "Running",
       "back": "← Back",
       "xp": "{{xp}} XP",
       "homeworkBanner": "📋 Homework — Due {{date}} · {{remaining}}",

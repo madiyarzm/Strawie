@@ -65,7 +65,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
-        mono: ["DM Mono", "ui-monospace", "monospace"],
+        mono: ["DM Mono", "SF Mono", "ui-monospace", "Menlo", "Monaco", "Consolas", "monospace"],
       },
       borderRadius: {
         sm: "10px",

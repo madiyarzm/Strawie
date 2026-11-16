@@ -2,96 +2,168 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Chalk Design Tokens ──────────────────────────────────────────────── */
+/* ── Strawie Design Tokens ─────────────────────────────────────────────
+   One palette for the whole product, matched to the landing page: warm
+   off-white canvas, white floating surfaces, near-black ink for primary
+   actions, pastel "berry" accents. Light is the default; dark is a warm
+   neutral opt-in (data-theme="dark"), never the old navy.
+
+   Legacy names are kept so existing inline styles keep working:
+     --indigo  = the PRIMARY action colour (ink in light, berry blue in dark)
+     --mint    = success, --amber = warning, --rose = error
+     --bg      = raised surface (cards, sidebar), --bg-2 = page canvas,
+     --bg-3    = inset / hover fill                                       */
 :root {
-  --indigo: oklch(55% 0.22 264);
-  --indigo-dim: oklch(48% 0.19 264);
-  --indigo-muted: oklch(55% 0.22 264 / 0.15);
-  --mint: oklch(72% 0.18 168);
-  --mint-dim: oklch(62% 0.15 168);
-  --mint-muted: oklch(72% 0.18 168 / 0.15);
-  --amber: oklch(78% 0.17 85);
-  --amber-dim: oklch(68% 0.14 85);
-  --amber-muted: oklch(78% 0.17 85 / 0.15);
-  --rose: oklch(65% 0.21 15);
-  --rose-dim: oklch(55% 0.18 15);
-  --rose-muted: oklch(65% 0.21 15 / 0.15);
+  --bg: #FFFFFF;
+  --bg-2: #FAFAF7;
+  --bg-3: #F2F2EE;
+  --border: #E7E7E2;
+  --border-2: #D6D6D0;
+  --subtle: #8A8A92;
+  --muted: #52525B;
+  --text: #0A0A0B;
+  --text-2: #27272A;
+  --text-3: #71717A;
 
-  --bg: oklch(14% 0.01 264);
-  --bg-2: oklch(18% 0.015 264);
-  --bg-3: oklch(22% 0.02 264);
-  --border: oklch(28% 0.025 264);
-  --border-2: oklch(35% 0.03 264);
-  --subtle: oklch(50% 0.04 264);
-  --muted: oklch(65% 0.03 264);
-  --text: oklch(92% 0.01 264);
+  --indigo: #0A0A0B;
+  --indigo-dim: #27272A;
+  --indigo-muted: rgba(10, 10, 11, 0.06);
+  --indigo-10: rgba(10, 10, 11, 0.05);
+  --indigo-20: rgba(10, 10, 11, 0.10);
+  --on-primary: #FFFFFF;
 
-  /* Aliases used by design handoff */
-  --text-2: oklch(75% 0.02 264);
-  --text-3: oklch(50% 0.04 264);
-  --font: "Plus Jakarta Sans", system-ui, sans-serif;
+  --accent: #5B7FFF;
+  --accent-2: #9B7BFF;
+  --accent-soft: #EEF2FF;
+
+  --mint: #0E9F6E;
+  --mint-dim: #057A55;
+  --mint-muted: rgba(16, 185, 129, 0.12);
+  --mint-10: rgba(16, 185, 129, 0.10);
+  --amber: #B7791F;
+  --amber-dim: #975A16;
+  --amber-muted: rgba(244, 197, 106, 0.28);
+  --amber-10: #FFF6E2;
+  --rose: #E5484D;
+  --rose-dim: #CD2B31;
+  --rose-muted: rgba(229, 72, 77, 0.10);
+  --rose-10: rgba(229, 72, 77, 0.08);
+  --emerald: var(--mint);
+
+  --font: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --mono: "DM Mono", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   --r: 12px;
   --r-lg: 20px;
-  --shadow: 0 0 0 1px var(--indigo), 0 8px 32px oklch(55% 0.22 264 / 0.2);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
-  /* Alpha swatches used in design tokens */
-  --indigo-10: oklch(55% 0.22 264 / 0.10);
-  --indigo-20: oklch(55% 0.22 264 / 0.20);
-  --mint-10: oklch(72% 0.18 168 / 0.12);
-  --amber-10: oklch(78% 0.17 85 / 0.12);
-  --rose-10: oklch(65% 0.21 15 / 0.12);
+  /* Layered "floating off the page" shadows, same as the landing cards. */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 2px 6px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.05), 0 12px 24px -8px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 8px rgba(15, 23, 42, 0.04), 0 16px 32px -8px rgba(15, 23, 42, 0.08), 0 32px 64px -16px rgba(15, 23, 42, 0.12);
+  --shadow: var(--shadow-md);
+  --backdrop: rgba(10, 10, 11, 0.28);
 
-  color-scheme: dark;
-}
-
-/* ── Light theme overrides ──────────────────────────────────────────────── */
-[data-theme="light"] {
-  --bg: oklch(98% 0.005 264);
-  --bg-2: oklch(95% 0.007 264);
-  --bg-3: oklch(91% 0.01 264);
-  --border: oklch(85% 0.015 264);
-  --border-2: oklch(78% 0.02 264);
-  --subtle: oklch(55% 0.04 264);
-  --muted: oklch(45% 0.03 264);
-  --text: oklch(12% 0.01 264);
-  --text-2: oklch(30% 0.02 264);
-  --text-3: oklch(50% 0.03 264);
-
-  --indigo: oklch(45% 0.22 264);
-  --indigo-dim: oklch(38% 0.19 264);
-  --indigo-muted: oklch(45% 0.22 264 / 0.12);
-  --mint: oklch(52% 0.18 168);
-  --mint-dim: oklch(44% 0.15 168);
-  --mint-muted: oklch(52% 0.18 168 / 0.12);
-  --amber: oklch(58% 0.17 85);
-  --amber-dim: oklch(50% 0.14 85);
-  --amber-muted: oklch(58% 0.17 85 / 0.12);
-  --rose: oklch(52% 0.21 15);
-  --rose-dim: oklch(44% 0.18 15);
-  --rose-muted: oklch(52% 0.21 15 / 0.12);
-
-  --indigo-10: oklch(45% 0.22 264 / 0.10);
-  --indigo-20: oklch(45% 0.22 264 / 0.18);
-  --mint-10: oklch(52% 0.18 168 / 0.10);
-  --amber-10: oklch(58% 0.17 85 / 0.10);
-  --rose-10: oklch(52% 0.21 15 / 0.10);
-
-  --shadow: 0 0 0 1px var(--indigo), 0 8px 32px oklch(45% 0.22 264 / 0.15);
+  /* Editor + output (light, same syntax colours as the landing demo). */
+  --editor-bg: #FFFFFF;
+  --editor-gutter: #FBFBF9;
+  --editor-gutter-text: #B4B4BC;
+  --editor-active: rgba(91, 127, 255, 0.05);
+  --editor-select: rgba(91, 127, 255, 0.16);
+  --editor-caret: #5B7FFF;
+  --syn-ink: #1F2937;
+  --syn-comment: #94A3B8;
+  --syn-keyword: #7C3AED;
+  --syn-fn: #0F766E;
+  --syn-string: #0E7490;
+  --syn-number: #B45309;
+  --syn-punct: #64748B;
+  --syn-class: #B45309;
+  --syn-const: #DB2777;
+  --term-bg: #FBFBF9;
+  --term-text: #27272A;
+  --term-dim: #A1A1AA;
+  --term-err: #D93036;
+  --term-ok: #0E9F6E;
 
   color-scheme: light;
 }
 
+/* ── Dark: warm neutral, not navy ──────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg: #19191B;
+  --bg-2: #111112;
+  --bg-3: #232326;
+  --border: #2B2B2F;
+  --border-2: #3A3A3F;
+  --subtle: #7C7C85;
+  --muted: #A1A1AA;
+  --text: #F4F4F2;
+  --text-2: #D4D4D8;
+  --text-3: #8E8E96;
+
+  --indigo: #7C93FF;
+  --indigo-dim: #6A82F5;
+  --indigo-muted: rgba(124, 147, 255, 0.14);
+  --indigo-10: rgba(124, 147, 255, 0.10);
+  --indigo-20: rgba(124, 147, 255, 0.20);
+  --on-primary: #FFFFFF;
+  --accent-soft: rgba(124, 147, 255, 0.14);
+
+  --mint: #34D399;
+  --mint-dim: #10B981;
+  --mint-muted: rgba(52, 211, 153, 0.14);
+  --mint-10: rgba(52, 211, 153, 0.10);
+  --amber: #F4C56A;
+  --amber-dim: #E0A93B;
+  --amber-muted: rgba(244, 197, 106, 0.16);
+  --amber-10: rgba(244, 197, 106, 0.10);
+  --rose: #FF7A70;
+  --rose-dim: #F2554A;
+  --rose-muted: rgba(255, 122, 112, 0.14);
+  --rose-10: rgba(255, 122, 112, 0.10);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -8px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.3), 0 24px 48px -12px rgba(0, 0, 0, 0.6);
+  --backdrop: rgba(0, 0, 0, 0.55);
+
+  --editor-bg: #19191B;
+  --editor-gutter: #19191B;
+  --editor-gutter-text: #55555D;
+  --editor-active: rgba(255, 255, 255, 0.03);
+  --editor-select: rgba(124, 147, 255, 0.24);
+  --editor-caret: #7C93FF;
+  --syn-ink: #E4E4E7;
+  --syn-comment: #6B6B74;
+  --syn-keyword: #B69CFF;
+  --syn-fn: #5EEAD4;
+  --syn-string: #7DD3FC;
+  --syn-number: #FDBA74;
+  --syn-punct: #8E8E96;
+  --syn-class: #FCD34D;
+  --syn-const: #F9A8D4;
+  --term-bg: #141416;
+  --term-text: #E4E4E7;
+  --term-dim: #6B6B74;
+  --term-err: #FF7A70;
+  --term-ok: #34D399;
+
+  color-scheme: dark;
+}
+
 /* Base styles */
 body {
-  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
-  background-color: var(--bg);
+  font-family: var(--font);
+  background-color: var(--bg-2);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-code, pre, .font-mono {
-  font-family: "DM Mono", ui-monospace, monospace;
+/* Menlo / SF Mono carry Cyrillic; plain `monospace` on macOS fell back to a
+   serif for RU/KK text, which made badges and the terminal look broken. */
+code, pre, kbd, .font-mono {
+  font-family: var(--mono);
 }
 
 /* ── Keyframes ──────────────────────────────────────────────────────────── */
@@ -132,20 +204,15 @@ code, pre, .font-mono {
 }
 
 /* ── Scrollbar ─────────────────────────────────────────────────────────── */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: var(--bg-2);
-}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--border-2);
-  border-radius: 3px;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: var(--subtle);
-}
+::-webkit-scrollbar-thumb:hover { background: var(--subtle); background-clip: content-box; border: 3px solid transparent; }
 
 /* ── Yjs collaborative cursor styles ──────────────────────────────────── */
 /* Selection highlight on remote selections — bright enough to spot at a glance,
@@ -204,29 +271,20 @@ code, pre, .font-mono {
 }
 
 /* ── Sidebar nav items (app shell) ───────────────────────────────────── */
+.sidebar-nav-item {
+  transition: background 160ms var(--ease), color 160ms var(--ease), transform 160ms var(--ease) !important;
+}
 .sidebar-nav-item[data-active="false"][data-disabled="false"]:hover {
-  background: var(--bg-2) !important;
-  color: var(--text-2) !important;
+  background: var(--bg-3) !important;
+  color: var(--text) !important;
 }
-/* Accent edge marks the active item — calmer than a full fill. */
-.sidebar-nav-item[data-active="true"]::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 18px;
-  border-radius: 0 3px 3px 0;
-  background: var(--indigo);
-}
+.sidebar-nav-item:active { transform: scale(0.985); }
 .sidebar-icon-btn {
   transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 .sidebar-icon-btn:hover {
-  background: var(--bg-2) !important;
+  background: var(--bg-3) !important;
   color: var(--text) !important;
-  border-color: var(--border-2) !important;
 }
 
 /* ── Global keyboard focus ring ──────────────────────────────────────── */
@@ -238,6 +296,280 @@ a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--indigo);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* ── Strawie UI primitives ──────────────────────────────────────────────
+   Small, shared building blocks so every surface moves and responds the
+   same way as the landing page: pill shapes, a 1px lift on hover, a soft
+   press, layered shadows. Prefixed `st-` to avoid clashing with Tailwind. */
+
+.st-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform 200ms var(--ease),
+    box-shadow 200ms var(--ease),
+    background-color 160ms var(--ease),
+    border-color 160ms var(--ease),
+    color 160ms var(--ease),
+    opacity 160ms var(--ease);
+}
+.st-btn:active:not(:disabled) { transform: translateY(0) scale(0.97); }
+.st-btn:disabled { opacity: 0.45; cursor: default; }
+.st-btn-sm { height: 28px; padding: 0 11px; font-size: 12px; gap: 5px; }
+.st-btn-lg { height: 40px; padding: 0 20px; font-size: 14px; }
+
+.st-btn-primary {
+  background: var(--indigo);
+  color: var(--on-primary);
+  box-shadow: var(--shadow-sm);
+}
+.st-btn-primary:hover:not(:disabled) {
+  background: var(--indigo-dim);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.st-btn-secondary {
+  background: var(--bg);
+  color: var(--text-2);
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.st-btn-secondary:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border-2);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.st-btn-ghost { background: transparent; color: var(--text-3); }
+.st-btn-ghost:hover:not(:disabled) { background: var(--bg-3); color: var(--text); }
+.st-btn-success {
+  background: var(--mint);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.st-btn-success:hover:not(:disabled) { filter: brightness(1.05); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.st-btn-warn { background: var(--amber-10); color: var(--amber-dim); border-color: var(--amber-muted); }
+.st-btn-warn:hover:not(:disabled) { border-color: var(--amber); }
+
+.st-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background-color 160ms var(--ease), color 160ms var(--ease), transform 160ms var(--ease);
+}
+.st-icon-btn:hover { background: var(--bg-3); color: var(--text); }
+.st-icon-btn:active { transform: scale(0.94); }
+
+.st-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-md);
+}
+
+.st-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--bg-3);
+  color: var(--text-2);
+}
+
+/* Segmented control (Code / Draw, Light / Dark, EN / RU / KK). */
+.st-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--bg-3);
+}
+.st-seg > button {
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 180ms var(--ease), color 180ms var(--ease), box-shadow 180ms var(--ease);
+}
+.st-seg > button:hover { color: var(--text); }
+.st-seg > button[aria-pressed="true"] {
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+[data-theme="dark"] .st-seg > button[aria-pressed="true"] { background: var(--border-2); }
+
+/* File tab, same as the landing editor's tab strip. */
+.st-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 160ms var(--ease), color 160ms var(--ease);
+}
+.st-tab:hover { color: var(--text-2); background: var(--bg-3); }
+.st-tab[aria-selected="true"] { background: var(--bg-3); color: var(--text); }
+.st-tab .st-tab-dot { width: 6px; height: 6px; border-radius: 999px; background: transparent; }
+.st-tab[aria-selected="true"] .st-tab-dot { background: var(--accent); }
+
+/* Popover menu. */
+.st-menu {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  animation: stPopIn 180ms var(--ease) both;
+}
+.st-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 140ms var(--ease), color 140ms var(--ease);
+}
+.st-menu-item:hover { background: var(--bg-3); color: var(--text); }
+.st-menu-label {
+  padding: 8px 10px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.st-menu-sep { height: 1px; margin: 6px 4px; background: var(--border); }
+
+/* Resize grip between editor and output. */
+.st-grip {
+  height: 12px;
+  flex-shrink: 0;
+  cursor: ns-resize;
+  display: grid;
+  place-items: center;
+}
+.st-grip::after {
+  content: "";
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background-color 160ms var(--ease), width 200ms var(--ease);
+}
+.st-grip:hover::after { background: var(--border-2); width: 52px; }
+
+kbd.st-kbd {
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 1px 5px;
+  border-radius: 5px;
+  opacity: 0.7;
+  background: rgba(255, 255, 255, 0.16);
+}
+.st-btn-secondary kbd.st-kbd, .st-btn-ghost kbd.st-kbd { background: var(--bg-3); }
+
+@keyframes stPopIn {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes stFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes stBackdropIn { from { opacity: 0; } to { opacity: 1; } }
+.st-pop-in { animation: stPopIn 220ms var(--ease) both; }
+.st-fade-up { animation: stFadeUp 360ms var(--ease) both; }
+.st-backdrop {
+  background: var(--backdrop);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: stBackdropIn 180ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* Sidebar rows: secondary actions (delete / leave) stay out of the way
+   until the row is hovered or focused. */
+.sidebar-row { transition: background-color 140ms var(--ease); }
+.sidebar-row:hover { background: var(--bg-3) !important; }
+.sidebar-row .sidebar-row-action { opacity: 0; }
+.sidebar-row:hover .sidebar-row-action,
+.sidebar-row .sidebar-row-action:focus-visible { opacity: 1; }
+
+@keyframes slideInRight {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+/* Text inputs: soft ring on focus instead of the hard outline. */
+.st-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  transition: border-color 160ms var(--ease), box-shadow 160ms var(--ease);
+}
+.st-input:hover { border-color: var(--border-2); }
+.st-input:focus,
+.st-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(91, 127, 255, 0.14);
 }

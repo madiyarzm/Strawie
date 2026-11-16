@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import i18n from "./i18n";
 import { CodeEditor } from "./components/CodeEditor";
+import type { PeerInfo } from "./hooks/useCollab";
 import { DrawingCanvas } from "./components/DrawingCanvas";
 import { SimpleInputModal } from "./components/SimpleInputModal";
 import {
@@ -38,7 +39,7 @@ import {
   revokeInviteCode,
   getAdminGroups,
 } from "./lib/api";
-import { Play, Square, X, Users, Shield, LifeBuoy, Home, LogOut, Trophy, Flame, Gem, Zap, PenLine, Crown, Star, Trash2, ChevronLeft, ChevronRight, Search, Ban, AlertTriangle, Eye, Key, BarChart3, FolderOpen, Clock, Sun, Moon, Inbox } from "lucide-react";
+import { Play, Square, X, Users, Shield, LifeBuoy, Home, LogOut, Trophy, Flame, Gem, Zap, PenLine, Crown, Star, Trash2, ChevronLeft, ChevronRight, Search, Ban, AlertTriangle, Eye, Key, BarChart3, FolderOpen, Clock, Sun, Moon, Inbox, ArrowLeft, Plus, LogIn, PanelLeftClose, PanelLeftOpen, ChevronsUpDown, Code2, Lightbulb, Check, TerminalSquare, Eraser } from "lucide-react";
 import { Confetti } from "./components/Confetti";
 import {
   onPyodideProgress,
@@ -46,7 +47,7 @@ import {
   warmupPyodide,
 } from "./lib/pyodideRunner";
 import { ChalkLogo } from "./components/Logo";
-import { LanguageSwitcher } from "./components/LanguageSwitcher";
+import { SUPPORTED_LANGUAGES } from "./i18n";
 import { Avatar } from "./components/Avatar";
 import { Badge } from "./components/Badge";
 import { ActivityGraph } from "./components/ActivityGraph";
@@ -160,21 +161,21 @@ const CreateAssignmentModal: React.FC<CreateAssignmentModalProps> = ({ onConfirm
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "oklch(0% 0 0 / 0.7)" }}>
+    <div className="st-backdrop fixed inset-0 z-50 flex items-center justify-center p-4" onMouseDown={e => { if (e.target === e.currentTarget) onCancel(); }}>
       <div
-        className="w-full max-w-lg rounded-[16px] shadow-2xl"
-        style={{ background: "var(--bg-2)", border: "1px solid var(--border)" }}
+        className="st-pop-in w-full max-w-lg rounded-[22px] max-h-[90vh] overflow-y-auto"
+        style={{ background: "var(--bg)", border: "1px solid var(--border)", boxShadow: "var(--shadow-lg)" }}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
-          <h2 className="text-sm font-semibold">{t("app.createAssignment.title")}</h2>
-          <button type="button" onClick={onCancel} style={{ color: "var(--subtle)" }} className="hover:text-[var(--text)] transition-colors">
+        <div className="flex items-center justify-between px-6 pt-5 pb-3">
+          <h2 className="text-[17px] font-semibold" style={{ letterSpacing: "-0.01em" }}>{t("app.createAssignment.title")}</h2>
+          <button type="button" onClick={onCancel} className="st-icon-btn">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
+        <form onSubmit={handleSubmit} className="px-6 pb-6 pt-1 space-y-4">
           <div className="space-y-1.5">
-            <label className="block text-xs" style={{ color: "var(--muted)" }}>{t("app.createAssignment.type")}</label>
+            <label className="block text-xs font-medium" style={{ color: "var(--muted)" }}>{t("app.createAssignment.type")}</label>
             <div className="grid grid-cols-2 gap-2">
               {[
                 { hw: false, emoji: "💻", title: t("app.createAssignment.exerciseTitle"), desc: t("app.createAssignment.exerciseDesc"), accent: "var(--indigo)" },
@@ -184,15 +185,15 @@ const CreateAssignmentModal: React.FC<CreateAssignmentModalProps> = ({ onConfirm
                   key={String(opt.hw)}
                   type="button"
                   onClick={() => setIsHomework(opt.hw)}
-                  className="flex flex-col items-start gap-1 px-3 py-3 rounded-[10px] border text-left transition-all"
+                  className="flex flex-col items-start gap-1 px-3.5 py-3 rounded-[14px] border text-left transition-all"
                   style={{
-                    borderColor: isHomework === opt.hw ? opt.accent : "var(--border)",
-                    background: isHomework === opt.hw ? `${opt.accent}15` : "var(--bg-3)",
-                    outline: isHomework === opt.hw ? `1px solid ${opt.accent}40` : undefined,
+                    borderColor: isHomework === opt.hw ? "var(--text)" : "var(--border)",
+                    background: isHomework === opt.hw ? "var(--bg)" : "var(--bg-2)",
+                    boxShadow: isHomework === opt.hw ? "var(--shadow-md)" : "none",
                   }}
                 >
                   <span className="text-lg leading-none">{opt.emoji}</span>
-                  <span className="text-xs font-semibold" style={{ color: isHomework === opt.hw ? opt.accent : "var(--text)" }}>{opt.title}</span>
+                  <span className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{opt.title}</span>
                   <span className="text-[10px] leading-snug" style={{ color: "var(--subtle)" }}>{opt.desc}</span>
                 </button>
               ))}
@@ -200,21 +201,19 @@ const CreateAssignmentModal: React.FC<CreateAssignmentModalProps> = ({ onConfirm
           </div>
 
           {isHomework && (
-            <div className="flex items-center gap-2 p-3 rounded-[10px]" style={{ background: "var(--indigo-muted)", border: "1px solid oklch(55% 0.22 264 / 0.25)" }}>
-              <span className="text-xs font-medium shrink-0" style={{ color: "var(--indigo)" }}>{t("app.createAssignment.due")}</span>
+            <div className="flex items-center gap-2 p-3 rounded-[14px]" style={{ background: "var(--bg-2)", border: "1px solid var(--border)" }}>
+              <span className="text-xs font-medium shrink-0" style={{ color: "var(--text-2)" }}>{t("app.createAssignment.due")}</span>
               <input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="flex-1 rounded bg-[var(--bg)] border border-[var(--border)] px-2 py-1 text-xs focus:outline-none"
-                style={{ color: "var(--text)" }}
+                className="st-input flex-1 rounded-[10px] px-2 py-1.5 text-xs"
               />
               <input
                 type="time"
                 value={dueTime}
                 onChange={(e) => setDueTime(e.target.value)}
-                className="w-24 rounded bg-[var(--bg)] border border-[var(--border)] px-2 py-1 text-xs focus:outline-none"
-                style={{ color: "var(--text)" }}
+                className="st-input w-24 rounded-[10px] px-2 py-1.5 text-xs"
               />
             </div>
           )}
@@ -227,9 +226,8 @@ const CreateAssignmentModal: React.FC<CreateAssignmentModalProps> = ({ onConfirm
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={t("app.createAssignment.titlePlaceholder")}
-              className="w-full rounded-[10px] px-3 py-2 text-sm placeholder:opacity-40 focus:outline-none"
-              style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)" }}
-              required
+              className="st-input w-full rounded-[12px] px-3 py-2 text-sm placeholder:opacity-40"
+                            required
             />
           </div>
 
@@ -240,9 +238,8 @@ const CreateAssignmentModal: React.FC<CreateAssignmentModalProps> = ({ onConfirm
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t("app.createAssignment.instructionsPlaceholder")}
               rows={3}
-              className="w-full rounded-[10px] px-3 py-2 text-sm placeholder:opacity-40 focus:outline-none resize-none"
-              style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)" }}
-            />
+              className="st-input w-full rounded-[12px] px-3 py-2 text-sm placeholder:opacity-40 resize-none"
+                          />
           </div>
 
           <div className="space-y-1">
@@ -251,9 +248,8 @@ const CreateAssignmentModal: React.FC<CreateAssignmentModalProps> = ({ onConfirm
               value={templateCode}
               onChange={(e) => setTemplateCode(e.target.value)}
               rows={5}
-              className="w-full rounded-[10px] px-3 py-2 text-xs font-mono focus:outline-none resize-none"
-              style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)" }}
-            />
+              className="st-input w-full rounded-[12px] px-3 py-2 text-xs font-mono resize-none"
+                          />
           </div>
 
           <div
@@ -287,26 +283,19 @@ const CreateAssignmentModal: React.FC<CreateAssignmentModalProps> = ({ onConfirm
                 onChange={(e) => setTestCode(e.target.value)}
                 rows={4}
                 placeholder="# assert my_function(2) == 4"
-                className="w-full rounded-[10px] px-3 py-2 text-xs font-mono placeholder:opacity-40 focus:outline-none resize-none"
-                style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)" }}
-              />
+                className="st-input w-full rounded-[12px] px-3 py-2 text-xs font-mono placeholder:opacity-40 resize-none"
+                              />
             )}
           </div>
 
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-3 py-1.5 text-xs rounded-[10px] transition-colors"
-              style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "transparent" }}
-            >
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onCancel} className="st-btn st-btn-ghost">
               {t("common.cancel")}
             </button>
             <button
               type="submit"
               disabled={!title.trim() || (isHomework && !dueDate)}
-              className="px-4 py-1.5 text-xs rounded-[10px] font-semibold disabled:opacity-50 transition-colors"
-              style={{ background: "var(--indigo)", color: "#fff" }}
+              className="st-btn st-btn-primary"
             >
               {isHomework ? t("app.createAssignment.createHomework") : t("app.createAssignment.createExercise")}
             </button>
@@ -380,6 +369,135 @@ const EmptyState: React.FC<{
 );
 
 
+// ─── UserMenu ────────────────────────────────────────────────────────────────
+// Account row at the bottom of the sidebar. Language, appearance, admin
+// tools and logout live behind it instead of permanently taking up space.
+
+interface UserMenuProps {
+  user: any;
+  role: "teacher" | "student";
+  collapsed: boolean;
+  isAdmin: boolean;
+  theme: "light" | "dark";
+  onThemeChange: (t: "light" | "dark") => void;
+  onViewAs: (r: "teacher" | "student") => void;
+  onOpenAdmin: () => void;
+  onLogout: () => void;
+}
+
+const UserMenu: React.FC<UserMenuProps> = ({ user, role, collapsed, isAdmin, theme, onThemeChange, onViewAs, onOpenAdmin, onLogout }) => {
+  const { t, i18n: i18nInst } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const lang = i18nInst.language?.split("-")[0] ?? "en";
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} style={{ position: "relative" }}>
+      {open && (
+        <div
+          className="st-menu"
+          role="menu"
+          style={{ position: "absolute", bottom: "calc(100% + 8px)", left: 0, width: 248, zIndex: 60 }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px 10px" }}>
+            <Avatar name={user?.name || user?.email || "?"} size={32} pulse={false} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.name}</div>
+              <div style={{ fontSize: 12, color: "var(--text-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email}</div>
+            </div>
+          </div>
+          <div className="st-menu-sep" />
+
+          <div className="st-menu-label">{t("app.menu.language")}</div>
+          <div style={{ padding: "0 6px 6px" }}>
+            <div className="st-seg" style={{ width: "100%" }}>
+              {SUPPORTED_LANGUAGES.map(l => (
+                <button key={l.code} type="button" aria-pressed={lang === l.code} onClick={() => void i18nInst.changeLanguage(l.code)} style={{ flex: 1, justifyContent: "center" }} title={l.name}>
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="st-menu-label">{t("app.menu.appearance")}</div>
+          <div style={{ padding: "0 6px 6px" }}>
+            <div className="st-seg" style={{ width: "100%" }}>
+              {(["light", "dark"] as const).map(m => (
+                <button key={m} type="button" aria-pressed={theme === m} onClick={() => onThemeChange(m)} style={{ flex: 1, justifyContent: "center" }}>
+                  {m === "light" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+                  {t(`app.menu.${m}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {isAdmin && (
+            <>
+              <div className="st-menu-label">{t("app.sidebar.viewAs")}</div>
+              <div style={{ padding: "0 6px 6px" }}>
+                <div className="st-seg" style={{ width: "100%" }}>
+                  {(["teacher", "student"] as const).map(r => (
+                    <button key={r} type="button" aria-pressed={role === r} onClick={() => onViewAs(r)} style={{ flex: 1, justifyContent: "center" }}>
+                      {t(`common.${r}`)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button type="button" className="st-menu-item" onClick={() => { setOpen(false); onOpenAdmin(); }}>
+                <Shield className="h-4 w-4" style={{ color: "var(--text-3)" }} />
+                {t("app.sidebar.users")}
+              </button>
+            </>
+          )}
+
+          <div className="st-menu-sep" />
+          <button type="button" className="st-menu-item" onClick={onLogout}>
+            <LogOut className="h-4 w-4" style={{ color: "var(--text-3)" }} />
+            {t("app.sidebar.logout")}
+          </button>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={collapsed ? (user?.name || "") : undefined}
+        className="sidebar-nav-item"
+        data-active={open}
+        data-disabled={false}
+        style={{
+          display: "flex", alignItems: "center", gap: 10, width: "100%",
+          padding: collapsed ? "6px 0" : "6px 8px", justifyContent: collapsed ? "center" : "flex-start",
+          borderRadius: 12, border: "none", cursor: "pointer", textAlign: "left",
+          background: open ? "var(--bg-3)" : "transparent",
+        }}
+      >
+        <Avatar name={user?.name || user?.email || "?"} size={30} pulse={false} />
+        {!collapsed && (
+          <>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.name}</div>
+              <div style={{ fontSize: 11.5, color: "var(--text-3)" }}>{t(`common.${role}`)}</div>
+            </div>
+            <ChevronsUpDown className="h-4 w-4" style={{ color: "var(--subtle)", flexShrink: 0 }} />
+          </>
+        )}
+      </button>
+    </div>
+  );
+};
+
 export const MentorApp: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -451,10 +569,15 @@ export const MentorApp: React.FC = () => {
   const [hintLoading, setHintLoading] = useState(false);
 
   const [viewAsRole, setViewAsRole] = useState<"teacher" | "student" | null>(null);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  // Light by default (matches the landing page); dark is an opt-in that
+  // sticks across visits.
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    try { return localStorage.getItem("strawie:theme") === "dark" ? "dark" : "light"; } catch { return "light"; }
+  });
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
+    try { localStorage.setItem("strawie:theme", theme); } catch { /* storage disabled */ }
   }, [theme]);
 
   useEffect(() => {
@@ -921,56 +1044,35 @@ export const MentorApp: React.FC = () => {
 
       {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
       <aside style={{
-        width: sidebarCollapsed ? 48 : 220,
+        width: sidebarCollapsed ? 64 : 236,
         flexShrink: 0, height: "100vh", position: "sticky", top: 0,
-        display: "flex", flexDirection: "column", overflow: "hidden",
+        display: "flex", flexDirection: "column",
         background: "var(--bg)", borderRight: "1px solid var(--border)",
-        padding: sidebarCollapsed ? "14px 6px" : "18px 10px",
-        transition: "width 200ms ease, padding 200ms ease",
+        padding: sidebarCollapsed ? "14px 10px" : "14px 12px",
+        transition: "width 240ms var(--ease), padding 240ms var(--ease)",
       }}>
         {/* Logo + collapse toggle */}
-        <div style={{ borderBottom: "1px solid var(--border)", marginBottom: 10, paddingBottom: 14, display: "flex", alignItems: "center", justifyContent: sidebarCollapsed ? "center" : "space-between", gap: 6 }}>
-          {!sidebarCollapsed && <ChalkLogo size={26} />}
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            {!sidebarCollapsed && (
-              <button
-                onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}
-                className="sidebar-icon-btn"
-                style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 8, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-3)" }}
-                title={t("app.sidebar.toggleTheme")}
-              >
-                {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-              </button>
-            )}
-            <button
-              onClick={() => setSidebarCollapsed(v => !v)}
-              style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: 8, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-3)" }}
-              title={sidebarCollapsed ? t("app.sidebar.expandSidebar") : t("app.sidebar.collapseSidebar")}
-            >
-              {sidebarCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
-            </button>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: sidebarCollapsed ? "center" : "space-between", gap: 6, height: 36, padding: sidebarCollapsed ? 0 : "0 4px 0 6px", marginBottom: 14 }}>
+          {!sidebarCollapsed && <ChalkLogo size={24} />}
+          <button
+            onClick={() => setSidebarCollapsed(v => !v)}
+            className="st-icon-btn"
+            title={sidebarCollapsed ? t("app.sidebar.expandSidebar") : t("app.sidebar.collapseSidebar")}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </button>
         </div>
 
-        {/* Nav items */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-            flex: 1,
-            minHeight: 0,
-            overflowY: "auto",
-            overflowX: "hidden",
-            paddingRight: 2,
-            scrollbarGutter: "stable",
-          }}
-        >
+        {/* Nav items + classes */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden" }}>
           {navItems.map(item => {
             const isActive = view === item.id;
             const isDisabled = (item.id === "classroom" && !currentClassroom) ||
               (item.id === "assignment" && !currentAssignment) ||
               (item.id === "submissions" && !currentClassroom);
+            // Context-dependent destinations only appear once they lead
+            // somewhere — no greyed-out dead buttons.
+            if (isDisabled) return null;
             return (
               <button
                 key={item.id}
@@ -978,182 +1080,137 @@ export const MentorApp: React.FC = () => {
                 title={sidebarCollapsed ? item.label : undefined}
                 className="sidebar-nav-item"
                 data-active={isActive}
-                data-disabled={isDisabled}
+                data-disabled={false}
                 style={{
                   position: "relative",
                   display: "flex", alignItems: "center", gap: 10,
-                  padding: sidebarCollapsed ? "9px 0" : "9px 12px",
+                  height: 36,
+                  padding: sidebarCollapsed ? 0 : "0 10px",
                   justifyContent: sidebarCollapsed ? "center" : "flex-start",
-                  borderRadius: "var(--r)", border: "none",
-                  background: isActive ? "var(--indigo-10)" : "transparent",
-                  color: isActive ? "var(--indigo)" : isDisabled ? "var(--border-2)" : "var(--text-3)",
-                  cursor: isDisabled ? "default" : "pointer",
+                  borderRadius: 10, border: "none",
+                  background: isActive ? "var(--bg-3)" : "transparent",
+                  color: isActive ? "var(--text)" : "var(--text-3)",
+                  cursor: "pointer",
                   fontSize: 13, fontWeight: isActive ? 600 : 500, textAlign: "left",
-                  transition: "background 160ms ease, color 160ms ease",
                 }}
               >
-                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth={isActive ? 1.9 : 1.6} viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
                   <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
                 </svg>
-                {!sidebarCollapsed && item.label}
+                {!sidebarCollapsed && <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.label}</span>}
               </button>
             );
           })}
 
           {/* Classroom list — hidden when collapsed */}
-          {!sidebarCollapsed && groups.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-3)", letterSpacing: "0.08em", textTransform: "uppercase", padding: "4px 12px 6px" }}>
-                {t("app.sidebar.classrooms")}
+          {!sidebarCollapsed && (
+            <div style={{ marginTop: 18 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6px 0 10px", marginBottom: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-3)" }}>{t("app.sidebar.classrooms")}</span>
+                <div style={{ display: "flex", gap: 2 }}>
+                  <button onClick={handleJoinGroup} className="st-icon-btn" style={{ width: 24, height: 24 }} title={t("app.sidebar.join")}>
+                    <LogIn className="h-3.5 w-3.5" />
+                  </button>
+                  {canCreate && (
+                    <button onClick={handleCreateGroup} className="st-icon-btn" style={{ width: 24, height: 24 }} title={t("app.sidebar.newGroup")}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
               {groups.map(g => {
                 const isExpanded = expandedGroupId === g.id;
                 const classrooms = groupClassrooms[g.id] || [];
                 const isOwner = g.teacher_id === user?.id;
                 return (
-                  <div key={g.id}>
-                    <div style={{ display: "flex", alignItems: "center" }}>
+                  <div key={g.id} className="group/grp">
+                    <div className="sidebar-row" style={{ display: "flex", alignItems: "center", borderRadius: 10 }}>
                       <button
                         onClick={() => toggleGroup(g.id)}
-                        style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, padding: "6px 4px 6px 12px", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-3)", fontSize: 12, fontWeight: 600 }}
+                        style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0, height: 32, padding: "0 4px 0 8px", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-2)", fontSize: 13, fontWeight: 600 }}
                       >
-                        <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d={isExpanded ? "M19 9l-7 7-7-7" : "M9 5l7 7-7 7"} />
-                        </svg>
+                        <ChevronRight className="h-3.5 w-3.5" style={{ flexShrink: 0, color: "var(--text-3)", transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform 200ms var(--ease)" }} />
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</span>
                       </button>
-                      {isOwner ? (
-                        <button
-                          onClick={e => { e.stopPropagation(); handleDeleteGroup(g.id, g.name); }}
-                          title={t("app.sidebar.deleteGroup")}
-                          style={{ flexShrink: 0, padding: "4px 8px 4px 4px", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-3)", opacity: 0.5, lineHeight: 1 }}
-                          onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
-                          onMouseLeave={e => (e.currentTarget.style.opacity = "0.5")}
-                        >
-                          <Trash2 size={11} />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={e => { e.stopPropagation(); handleLeaveGroup(g.id, g.name); }}
-                          title={t("app.sidebar.leaveGroup", { defaultValue: "Leave group" })}
-                          style={{ flexShrink: 0, padding: "4px 8px 4px 4px", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-3)", opacity: 0.5, lineHeight: 1 }}
-                          onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
-                          onMouseLeave={e => (e.currentTarget.style.opacity = "0.5")}
-                        >
-                          <LogOut size={11} />
-                        </button>
-                      )}
+                      <button
+                        onClick={e => { e.stopPropagation(); if (isOwner) { handleDeleteGroup(g.id, g.name); } else { handleLeaveGroup(g.id, g.name); } }}
+                        title={isOwner ? t("app.sidebar.deleteGroup") : t("app.sidebar.leaveGroup", { defaultValue: "Leave group" })}
+                        className="st-icon-btn sidebar-row-action"
+                        style={{ width: 24, height: 24, marginRight: 4 }}
+                      >
+                        {isOwner ? <Trash2 size={12} /> : <LogOut size={12} />}
+                      </button>
                     </div>
-                    {isExpanded && classrooms.map(c => (
-                      <div key={c.id} style={{ display: "flex", alignItems: "center" }}>
-                        <button
-                          onClick={() => openClassroom({ ...c, invite_code: g.invite_code })}
-                          style={{
-                            display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0,
-                            padding: "6px 4px 6px 28px", border: "none",
-                            cursor: "pointer", fontSize: 12,
-                            color: currentClassroom?.id === c.id ? "var(--indigo)" : "var(--text-3)",
-                            background: currentClassroom?.id === c.id ? "var(--indigo-10)" : "transparent",
-                            borderRadius: "var(--r)",
-                          }}
-                        >
-                          <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                          </svg>
-                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
-                        </button>
+                    {isExpanded && (
+                      <div className="st-fade-up" style={{ marginLeft: 15, paddingLeft: 8, borderLeft: "1px solid var(--border)", marginBottom: 4 }}>
+                        {classrooms.map(c => {
+                          const active = currentClassroom?.id === c.id;
+                          const live = classroomActiveCounts[c.id] || 0;
+                          return (
+                            <div key={c.id} className="sidebar-row" style={{ display: "flex", alignItems: "center", borderRadius: 8, background: active ? "var(--bg-3)" : "transparent" }}>
+                              <button
+                                onClick={() => openClassroom({ ...c, invite_code: g.invite_code })}
+                                style={{
+                                  display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0,
+                                  height: 30, padding: "0 4px 0 8px", border: "none", background: "transparent",
+                                  cursor: "pointer", fontSize: 12.5, fontWeight: active ? 600 : 500,
+                                  color: active ? "var(--text)" : "var(--text-3)",
+                                }}
+                              >
+                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                                {live > 0 && <span title={t("app.classroom.liveNow", { count: live })} style={{ width: 6, height: 6, borderRadius: 999, background: "var(--mint)", flexShrink: 0 }} />}
+                              </button>
+                              {canCreate && (
+                                <button
+                                  onClick={e => { e.stopPropagation(); handleDeleteClassroom(c.id, c.name, g.id); }}
+                                  title={t("app.sidebar.deleteClassroom")}
+                                  className="st-icon-btn sidebar-row-action"
+                                  style={{ width: 22, height: 22, marginRight: 4 }}
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {classrooms.length === 0 && (
+                          <div style={{ padding: "6px 8px", fontSize: 12, color: "var(--subtle)" }}>{t("app.sidebar.noClassrooms")}</div>
+                        )}
                         {canCreate && (
                           <button
-                            onClick={e => { e.stopPropagation(); handleDeleteClassroom(c.id, c.name, g.id); }}
-                            title={t("app.sidebar.deleteClassroom")}
-                            style={{ flexShrink: 0, padding: "4px 8px 4px 4px", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-3)", opacity: 0.5, lineHeight: 1 }}
-                            onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
-                            onMouseLeave={e => (e.currentTarget.style.opacity = "0.5")}
+                            onClick={e => { e.stopPropagation(); handleCreateClassroom(g.id); }}
+                            className="st-btn st-btn-ghost st-btn-sm"
+                            style={{ height: 28, padding: "0 8px", fontWeight: 500, color: "var(--text-3)" }}
                           >
-                            <Trash2 size={11} />
+                            <Plus className="h-3.5 w-3.5" />
+                            {t("app.sidebar.newClassroom").replace(/^\+\s*/, "")}
                           </button>
                         )}
                       </div>
-                    ))}
-                    {isExpanded && classrooms.length === 0 && (
-                      <div style={{ padding: "4px 12px 4px 28px", fontSize: 11, color: "var(--border-2)" }}>{t("app.sidebar.noClassrooms")}</div>
-                    )}
-                    {isExpanded && canCreate && (
-                      <button
-                        onClick={e => { e.stopPropagation(); handleCreateClassroom(g.id); }}
-                        style={{ display: "block", width: "100%", padding: "4px 12px 4px 28px", background: "transparent", border: "none", cursor: "pointer", fontSize: 11, color: "var(--indigo)", textAlign: "left" }}
-                      >
-                        {t("app.sidebar.newClassroom")}
-                      </button>
                     )}
                   </div>
                 );
               })}
-              <div style={{ display: "flex", gap: 4, padding: "4px 12px" }}>
-                <button onClick={handleJoinGroup} style={{ flex: 1, padding: "5px 0", borderRadius: 6, fontSize: 11, fontWeight: 500, background: "var(--bg-3)", border: "none", cursor: "pointer", color: "var(--text-3)" }}>{t("app.sidebar.join")}</button>
-                {canCreate && <button onClick={handleCreateGroup} style={{ flex: 1, padding: "5px 0", borderRadius: 6, fontSize: 11, fontWeight: 600, background: "var(--bg-3)", border: "none", cursor: "pointer", color: "var(--indigo)" }}>{t("app.sidebar.newGroup")}</button>}
-              </div>
+              {groups.length === 0 && (
+                <div style={{ padding: "6px 10px", fontSize: 12, color: "var(--subtle)", lineHeight: 1.5 }}>{t("app.sidebar.noClassrooms")}</div>
+              )}
             </div>
           )}
         </div>
 
-        {/* VIEW AS — admin only, hidden when collapsed */}
-        {!sidebarCollapsed && isAdmin && (
-          <div style={{ background: "var(--bg-2)", borderRadius: "var(--r)", padding: 10, marginBottom: 12 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-3)", letterSpacing: "0.08em", marginBottom: 8, textTransform: "uppercase" }}>{t("app.sidebar.viewAs")}</div>
-            <div style={{ display: "flex", gap: 4, background: "var(--bg-3)", borderRadius: 8, padding: 3 }}>
-              {(["teacher", "student"] as const).map(r => (
-                <button
-                  key={r}
-                  onClick={() => { setViewAsRole(r); setFailedAttempts(0); setHint(null); }}
-                  style={{
-                    flex: 1, padding: "5px 0", borderRadius: 6, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer",
-                    background: effectiveRole === r ? "var(--bg)" : "transparent",
-                    color: effectiveRole === r ? "var(--text)" : "var(--text-3)",
-                    boxShadow: effectiveRole === r ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
-                  }}
-                >{t(`common.${r}`)}</button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Language switcher */}
-        {!sidebarCollapsed && (
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-            <LanguageSwitcher variant="dark" />
-          </div>
-        )}
-
-        {/* User row */}
-        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 14 }}>
-          {!sidebarCollapsed && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 6px 8px" }}>
-              <Avatar name={user?.name || user?.email || "?"} size={32} pulse={false} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.name}</div>
-                <div style={{ fontSize: 11, color: "var(--text-3)" }}>{t(`common.${effectiveRole}`)}</div>
-              </div>
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 4, flexDirection: sidebarCollapsed ? "column" : "row", alignItems: sidebarCollapsed ? "center" : "stretch" }}>
-            {isAdmin && (
-              <button
-                onClick={handleOpenAdminPanel}
-                title={sidebarCollapsed ? t("app.sidebar.users") : undefined}
-                style={{ flex: sidebarCollapsed ? undefined : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: "5px 0", borderRadius: 6, fontSize: 11, background: "var(--bg-3)", border: "none", cursor: "pointer", color: "var(--text-3)", width: sidebarCollapsed ? 36 : undefined, height: sidebarCollapsed ? 30 : undefined }}
-              >
-                <Users className="h-3 w-3" />{!sidebarCollapsed && ` ${t("app.sidebar.users")}`}
-              </button>
-            )}
-            <button
-              onClick={handleLogout}
-              title={sidebarCollapsed ? t("app.sidebar.logout") : undefined}
-              style={{ flex: sidebarCollapsed ? undefined : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: "5px 0", borderRadius: 6, fontSize: 11, background: "var(--bg-3)", border: "none", cursor: "pointer", color: "var(--text-3)", width: sidebarCollapsed ? 36 : undefined, height: sidebarCollapsed ? 30 : undefined }}
-            >
-              <LogOut className="h-3 w-3" />{!sidebarCollapsed && ` ${t("app.sidebar.logout")}`}
-            </button>
-          </div>
+        {/* Account: everything that isn't navigation lives in one menu. */}
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, marginTop: 8 }}>
+          <UserMenu
+            user={user}
+            role={effectiveRole}
+            collapsed={sidebarCollapsed}
+            isAdmin={isAdmin}
+            theme={theme}
+            onThemeChange={setTheme}
+            onViewAs={r => { setViewAsRole(r); setFailedAttempts(0); setHint(null); }}
+            onOpenAdmin={handleOpenAdminPanel}
+            onLogout={handleLogout}
+          />
         </div>
       </aside>
 
@@ -1273,10 +1330,10 @@ export const MentorApp: React.FC = () => {
       )}
 
       {showAdminPanel && (
-        <div className="fixed inset-0 z-50 flex items-start justify-end" style={{ background: "oklch(0% 0 0 / 0.6)" }}>
+        <div className="st-backdrop fixed inset-0 z-50 flex items-start justify-end" onMouseDown={e => { if (e.target === e.currentTarget) setShowAdminPanel(false); }}>
           <div
-            className="h-full w-full flex flex-col shadow-2xl"
-            style={{ background: "var(--bg-2)", borderLeft: "1px solid var(--border)", maxWidth: 640 }}
+            className="h-full w-full flex flex-col"
+            style={{ background: "var(--bg)", borderLeft: "1px solid var(--border)", maxWidth: 640, boxShadow: "var(--shadow-lg)", animation: "slideInRight 260ms var(--ease) both" }}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "var(--border)" }}>
@@ -1497,7 +1554,7 @@ export const MentorApp: React.FC = () => {
                                   </div>
                                   <div className="flex items-center gap-1.5">
                                     {f.flags.slice(0, 3).map((fl: any, i: number) => (
-                                      <span key={i} className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "oklch(0.7 0.15 25 / 0.15)", color: "var(--rose)" }}>
+                                      <span key={i} className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "var(--rose-muted)", color: "var(--rose)" }}>
                                         {fl.label}
                                       </span>
                                     ))}
@@ -1628,7 +1685,7 @@ const XP_FRAMES = [
 ];
 
 const XP_BGTYPES = [
-  { id: "default", name: "Default", cost: 0,    bg: "linear-gradient(135deg, oklch(0.52 0.26 265) 0%, oklch(0.48 0.27 265) 100%)" },
+  { id: "default", name: "Default", cost: 0,    bg: "linear-gradient(120deg, #5B7FFF 0%, #7F7DFF 55%, #9B7BFF 100%)" },
   { id: "cosmic",  name: "Cosmic",  cost: 200,  bg: "linear-gradient(135deg, #0d0221 0%, #1a0533 50%, #0d1b2a 100%)" },
   { id: "matrix",  name: "Matrix",  cost: 300,  bg: "linear-gradient(135deg, #001100 0%, #003300 50%, #001a00 100%)" },
   { id: "sunset",  name: "Sunset",  cost: 400,  bg: "linear-gradient(135deg, #ff6b35 0%, #f7c948 50%, #e8506a 100%)" },
@@ -1706,7 +1763,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ user, groups, groupClassr
       return (
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-2)" }}>
           <div style={{ textAlign: "center", maxWidth: 320 }}>
-            <div style={{ width: 56, height: 56, borderRadius: 16, background: "var(--indigo-muted)", border: "1px solid oklch(55% 0.22 264 / 0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: "var(--indigo-muted)", border: "1px solid var(--indigo-20)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
               <Home className="h-6 w-6" style={{ color: "var(--indigo)" }} />
             </div>
             <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>{t("app.dashboard.teacher.emptyTitle")}</h2>
@@ -1725,14 +1782,13 @@ const DashboardView: React.FC<DashboardViewProps> = ({ user, groups, groupClassr
             <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{user?.name ? t("app.dashboard.teacher.welcomeBackNamed", { name: user.name.split(" ")[0] }) : t("app.dashboard.teacher.welcomeBack")}</h1>
             <p style={{ fontSize: 13, color: "var(--text-3)" }}>{t("app.dashboard.teacher.welcomeSub")}</p>
           </div>
-          <LanguageSwitcher variant="dark" />
         </div>
 
         <div style={{ padding: "24px 32px" }}>
           {/* Stat cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 32 }}>
             {teacherStats.map(s => (
-              <div key={s.label} style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r-lg)", padding: "20px 20px 16px" }}>
+              <div key={s.label} style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r-lg)", boxShadow: "var(--shadow-sm)", padding: "20px 20px 16px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                   <div style={{ width: 36, height: 36, borderRadius: 10, background: `${s.color}1a`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <svg width="18" height="18" fill="none" stroke={s.color} strokeWidth="1.5" viewBox="0 0 24 24">
@@ -1770,7 +1826,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ user, groups, groupClassr
                   <button
                     key={c.id}
                     onClick={() => onOpenClassroom(c)}
-                    style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r-lg)", padding: 20, textAlign: "left", cursor: "pointer", transition: "border-color 150ms" }}
+                    style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r-lg)", boxShadow: "var(--shadow-sm)", padding: 20, textAlign: "left", cursor: "pointer", transition: "border-color 150ms" }}
                     onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--indigo)")}
                     onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--border)")}
                   >
@@ -1830,7 +1886,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ user, groups, groupClassr
     return (
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-2)" }}>
         <div style={{ textAlign: "center", maxWidth: 320 }}>
-          <div style={{ width: 56, height: 56, borderRadius: 16, background: "var(--indigo-muted)", border: "1px solid oklch(55% 0.22 264 / 0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+          <div style={{ width: 56, height: 56, borderRadius: 16, background: "var(--indigo-muted)", border: "1px solid var(--indigo-20)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
             <Home className="h-6 w-6" style={{ color: "var(--indigo)" }} />
           </div>
           <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>{t("app.dashboard.student.emptyTitle")}</h2>
@@ -1881,11 +1937,10 @@ const DashboardView: React.FC<DashboardViewProps> = ({ user, groups, groupClassr
               <div style={{ flex: 1, height: 6, background: "rgba(255,255,255,0.2)", borderRadius: 3, overflow: "hidden" }}>
                 <div style={{ height: "100%", width: `${xpPct}%`, background: "#fff", borderRadius: 3, transition: "width 600ms ease" }} />
               </div>
-              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", fontFamily: "DM Mono, monospace" }}>{xpPct}%</span>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", fontFamily: "var(--mono)" }}>{xpPct}%</span>
             </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-            <LanguageSwitcher variant="glass" />
             <button
               onClick={() => setShopOpen(o => !o)}
               style={{ padding: "8px 16px", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "var(--r)", fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", backdropFilter: "blur(4px)" }}
@@ -1977,7 +2032,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ user, groups, groupClassr
         {/* Stat cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 28 }}>
           {studentStats.map(s => (
-            <div key={s.label} style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r-lg)", padding: "18px 20px" }}>
+            <div key={s.label} style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r-lg)", boxShadow: "var(--shadow-sm)", padding: "18px 20px" }}>
               <div style={{ fontSize: 28, fontWeight: 700, color: s.color, marginBottom: 2 }}>{s.value}</div>
               <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-2)" }}>{s.label}</div>
               <div style={{ fontSize: 11, color: "var(--text-3)" }}>{s.sub}</div>
@@ -2011,7 +2066,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ user, groups, groupClassr
             {activityDays.length > 0 && (
               <div>
                 <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t("app.dashboard.student.activity")}</h3>
-                <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r-lg)", padding: "16px 20px" }}>
+                <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r-lg)", boxShadow: "var(--shadow-sm)", padding: "16px 20px" }}>
                   <ActivityGraph days={activityDays} />
                 </div>
               </div>
@@ -2024,7 +2079,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ user, groups, groupClassr
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <button
                 onClick={onOpenWorkspace}
-                style={{ background: "var(--indigo-muted)", border: "1px solid oklch(55% 0.22 264 / 0.35)", borderRadius: "var(--r)", padding: "12px 14px", textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+                style={{ background: "var(--indigo-muted)", border: "1px solid var(--indigo-20)", borderRadius: "var(--r)", padding: "12px 14px", textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
               >
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--indigo)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="1.8" viewBox="0 0 24 24">
@@ -2040,7 +2095,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ user, groups, groupClassr
                 <button
                   key={c.id}
                   onClick={() => onOpenClassroom(c)}
-                  style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "12px 14px", textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+                  style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r)", boxShadow: "var(--shadow-sm)", padding: "12px 14px", textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
                 >
                   <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--indigo-muted)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "var(--indigo)", flexShrink: 0 }}>
                     {c.name?.[0]?.toUpperCase() || "C"}
@@ -2108,7 +2163,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{classroom.name}</h1>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <code style={{ fontFamily: "DM Mono, monospace", background: "var(--bg-2)", border: "1px solid var(--border)", padding: "3px 10px", borderRadius: 6, fontSize: 11, color: "var(--text-2)" }}>
+              <code style={{ fontFamily: "var(--mono)", background: "var(--bg-2)", border: "1px solid var(--border)", padding: "3px 10px", borderRadius: 6, fontSize: 11, color: "var(--text-2)" }}>
                 {t("app.classroom.invite", { code: classroom.invite_code || classroom.code || "—" })}
               </code>
               {activeCount > 0 && (
@@ -2125,7 +2180,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({
                 onClick={onDelete}
                 title={t("app.classroom.deleteClassroom")}
                 style={{ padding: "9px 12px", background: "transparent", color: "var(--text-3)", border: "1px solid var(--border)", borderRadius: "var(--r)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
-                onMouseEnter={e => { e.currentTarget.style.color = "#ef4444"; e.currentTarget.style.borderColor = "#ef4444"; }}
+                onMouseEnter={e => { e.currentTarget.style.color = "var(--rose)"; e.currentTarget.style.borderColor = "var(--rose)"; }}
                 onMouseLeave={e => { e.currentTarget.style.color = "var(--text-3)"; e.currentTarget.style.borderColor = "var(--border)"; }}
               >
                 <Trash2 size={14} />
@@ -2174,13 +2229,13 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({
                   key={a.id}
                   onClick={() => onOpenAssignment(a)}
                   style={{
-                    background: "var(--bg)", border: `1px solid ${isHw ? "oklch(55% 0.22 264 / 0.3)" : "var(--border)"}`,
+                    background: "var(--bg)", border: `1px solid ${isHw ? "var(--indigo-20)" : "var(--border)"}`,
                     borderLeft: isHw ? "3px solid var(--indigo)" : undefined,
                     borderRadius: "var(--r)", padding: "16px 20px", cursor: "pointer",
                     transition: "border-color 120ms",
                   }}
                   onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--indigo)")}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = isHw ? "oklch(55% 0.22 264 / 0.3)" : "var(--border)")}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = isHw ? "var(--indigo-20)" : "var(--border)")}
                 >
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -2199,7 +2254,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({
                               strokeLinecap="round"
                             />
                           </svg>
-                          <span style={{ fontSize: 11, fontFamily: "DM Mono, monospace", color: pct >= 100 ? "var(--mint)" : "var(--text-3)" }}>{t("app.classroom.submittedCount", { count: submittedCount })}</span>
+                          <span style={{ fontSize: 11, fontFamily: "var(--mono)", color: pct >= 100 ? "var(--mint)" : "var(--text-3)" }}>{t("app.classroom.submittedCount", { count: submittedCount })}</span>
                         </div>
                       )}
                       {userRole === "student" && mySub && <Badge type={late ? "timeout" : "success"} label={late ? t("app.classroom.submittedLate") : t("app.classroom.submitted")} />}
@@ -2242,7 +2297,7 @@ const ClassroomView: React.FC<ClassroomViewProps> = ({
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {groupMembers.map((m: any) => (
-                  <div key={m.user_id || m.id} style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                  <div key={m.user_id || m.id} style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r)", boxShadow: "var(--shadow-sm)", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--indigo-muted)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "var(--indigo)", flexShrink: 0 }}>
                       {(m.name || m.email || "?")[0].toUpperCase()}
                     </div>
@@ -2283,9 +2338,9 @@ interface SubmissionDetailPanelProps {
 }
 
 const SUBMISSION_STATUS_STYLE: Record<string, { bg: string; color: string; dot: string }> = {
-  success: { bg: "var(--mint-10)",  color: "oklch(0.40 0.14 162)", dot: "var(--mint)" },
+  success: { bg: "var(--mint-10)",  color: "var(--mint-dim)", dot: "var(--mint)" },
   error:   { bg: "var(--rose-10)",  color: "var(--rose)",          dot: "var(--rose)" },
-  timeout: { bg: "var(--amber-10)", color: "oklch(0.52 0.14 75)",  dot: "var(--amber)" },
+  timeout: { bg: "var(--amber-10)", color: "var(--amber-dim)",  dot: "var(--amber)" },
 };
 
 const SubmissionDetailPanel: React.FC<SubmissionDetailPanelProps> = ({
@@ -2353,25 +2408,25 @@ const SubmissionDetailPanel: React.FC<SubmissionDetailPanelProps> = ({
           {submission.status_display || submission.status}
         </span>
         {typeof returncode === "number" && (
-          <span><strong style={{ color: "var(--text-2)" }}>{t("app.submissionDetail.exit")}</strong> <code style={{ fontFamily: "DM Mono, monospace" }}>{returncode}</code></span>
+          <span><strong style={{ color: "var(--text-2)" }}>{t("app.submissionDetail.exit")}</strong> <code style={{ fontFamily: "var(--mono)" }}>{returncode}</code></span>
         )}
         {timedOut && <span style={{ color: "var(--amber)" }}>{t("app.submissionDetail.timedOut")}</span>}
         {testPassed === true && <span style={{ color: "var(--mint)" }}>{t("app.submissionDetail.testsPassed")}</span>}
         {testPassed === false && <span style={{ color: "var(--rose)" }}>{t("app.submissionDetail.testsFailed")}</span>}
         {testPassed === null && <span>{t("app.submissionDetail.noTests")}</span>}
-        <span><strong style={{ color: "var(--text-2)" }}>{t("app.submissionDetail.id")}</strong> <code style={{ fontFamily: "DM Mono, monospace" }}>{String(submission.id).slice(0, 8)}</code></span>
+        <span><strong style={{ color: "var(--text-2)" }}>{t("app.submissionDetail.id")}</strong> <code style={{ fontFamily: "var(--mono)" }}>{String(submission.id).slice(0, 8)}</code></span>
       </div>
 
       <div style={{ flex: 1, padding: "16px 20px" }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>{t("app.submissionDetail.code")}</div>
-        <pre style={{ background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "14px 16px", fontSize: 12, fontFamily: "DM Mono, monospace", color: "var(--text)", overflow: "auto", lineHeight: 1.7, maxHeight: 360, whiteSpace: "pre" }}>
+        <pre style={{ background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "14px 16px", fontSize: 12, fontFamily: "var(--mono)", color: "var(--text)", overflow: "auto", lineHeight: 1.7, maxHeight: 360, whiteSpace: "pre" }}>
           {submission.code || t("app.submissionDetail.noCode")}
         </pre>
 
         {stdout && (
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{t("app.submissionDetail.stdout")}</div>
-            <pre style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "10px 14px", fontSize: 12, fontFamily: "DM Mono, monospace", color: "var(--text-2)", overflow: "auto", lineHeight: 1.6, maxHeight: 180, whiteSpace: "pre-wrap" }}>
+            <pre style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "10px 14px", fontSize: 12, fontFamily: "var(--mono)", color: "var(--text-2)", overflow: "auto", lineHeight: 1.6, maxHeight: 180, whiteSpace: "pre-wrap" }}>
               {stdout}
             </pre>
           </div>
@@ -2380,7 +2435,7 @@ const SubmissionDetailPanel: React.FC<SubmissionDetailPanelProps> = ({
         {stderr && (
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "var(--rose)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{t("app.submissionDetail.stderr")}</div>
-            <pre style={{ background: "var(--rose-10)", border: "1px solid var(--rose-muted)", borderRadius: "var(--r)", padding: "10px 14px", fontSize: 12, fontFamily: "DM Mono, monospace", color: "var(--rose)", overflow: "auto", lineHeight: 1.6, maxHeight: 240, whiteSpace: "pre-wrap" }}>
+            <pre style={{ background: "var(--rose-10)", border: "1px solid var(--rose-muted)", borderRadius: "var(--r)", padding: "10px 14px", fontSize: 12, fontFamily: "var(--mono)", color: "var(--rose)", overflow: "auto", lineHeight: 1.6, maxHeight: 240, whiteSpace: "pre-wrap" }}>
               {stderr}
             </pre>
           </div>
@@ -2395,7 +2450,7 @@ const SubmissionDetailPanel: React.FC<SubmissionDetailPanelProps> = ({
         {testOutput && (
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{t("app.submissionDetail.autoGraderOutput")}</div>
-            <pre style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "10px 14px", fontSize: 12, fontFamily: "DM Mono, monospace", color: testPassed ? "var(--mint)" : "var(--text-2)", overflow: "auto", lineHeight: 1.6, maxHeight: 200, whiteSpace: "pre-wrap" }}>
+            <pre style={{ background: "var(--bg-3)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "10px 14px", fontSize: 12, fontFamily: "var(--mono)", color: testPassed ? "var(--mint)" : "var(--text-2)", overflow: "auto", lineHeight: 1.6, maxHeight: 200, whiteSpace: "pre-wrap" }}>
               {testOutput}
             </pre>
           </div>
@@ -2412,7 +2467,7 @@ const SubmissionDetailPanel: React.FC<SubmissionDetailPanelProps> = ({
                 onChange={e => setFeedbackDraft(e.target.value)}
                 placeholder={t("app.submissionDetail.feedbackPlaceholder")}
                 rows={4}
-                style={{ width: "100%", boxSizing: "border-box", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: "8px 10px", fontSize: 12, color: "var(--text)", fontFamily: "inherit", resize: "vertical" }}
+                style={{ width: "100%", boxSizing: "border-box", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r)", boxShadow: "var(--shadow-sm)", padding: "8px 10px", fontSize: 12, color: "var(--text)", fontFamily: "inherit", resize: "vertical" }}
               />
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
                 <button
@@ -2620,7 +2675,7 @@ const SubmissionsView: React.FC<SubmissionsViewProps> = ({
                   >
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ fontSize: 10, color: "var(--subtle)", fontFamily: "DM Mono, monospace" }}>#{studentSubs.length - idx}</span>
+                        <span style={{ fontSize: 10, color: "var(--subtle)", fontFamily: "var(--mono)" }}>#{studentSubs.length - idx}</span>
                         <span style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>
                           {asg?.title || t("app.submissions.unknownAssignment")}
                         </span>
@@ -2634,7 +2689,7 @@ const SubmissionsView: React.FC<SubmissionsViewProps> = ({
                       {s.submitted_at ? new Date(s.submitted_at).toLocaleString() : ""}
                     </div>
                     {s.output && (
-                      <div style={{ marginTop: 5, fontSize: 10, fontFamily: "DM Mono, monospace", color: s.status === "success" ? "var(--mint)" : "var(--rose)", background: "var(--bg-2)", padding: "4px 8px", borderRadius: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ marginTop: 5, fontSize: 10, fontFamily: "var(--mono)", color: s.status === "success" ? "var(--mint)" : "var(--rose)", background: "var(--bg-2)", padding: "4px 8px", borderRadius: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {s.output.split("\n")[0]}
                       </div>
                     )}
@@ -2710,6 +2765,7 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
   const [editorMode, setEditorMode] = useState<"code" | "draw">("code");
   const [handRaised, setHandRaised] = useState(false);
   const [rightOpen, setRightOpen] = useState(true);
+  const [peers, setPeers] = useState<PeerInfo[]>([]);
   const isHomework = !!assignment.due_at;
 
   // Streaming terminal state
@@ -2901,231 +2957,282 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
   const mySub = userRole === "student" ? (submissions.find((s: any) => s.user_id === userId) || null) : null;
   const deadlineUrgency = getDeadlineUrgency(assignment.due_at);
 
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Assignment header */}
-      <div
-        className="flex items-center justify-between px-4 py-3 border-b shrink-0"
-        style={{ borderColor: "var(--border)", background: "var(--bg-2)" }}
-      >
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="px-2.5 py-1 text-xs rounded-[8px] border transition-colors"
-            style={{ border: "1px solid var(--border)", color: "var(--muted)" }}
-          >
-            {t("app.assignment.back")}
-          </button>
-          <span className="font-semibold">{assignment.title}</span>
-          {isHomework && <DeadlineBadge dueAt={assignment.due_at} />}
-        </div>
-        {userRole === "student" && xp != null && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[10px]" style={{ background: "var(--amber-10)", border: "1px solid var(--amber-muted)" }}>
-            <Zap className="h-3 w-3" style={{ color: "var(--amber)" }} />
-            <span className="text-xs font-semibold" style={{ color: "var(--amber)" }}>{t("app.assignment.xp", { xp })}</span>
-          </div>
-        )}
-      </div>
+  // Keyboard: ⌘/Ctrl+Enter runs, ⌘/Ctrl+Shift+Enter submits. Captured before
+  // CodeMirror (whose default keymap binds Mod-Enter to "insert blank line").
+  const shortcutRef = useRef({ run: handleRun, submit: () => onSubmit(collectedInputsRef.current) });
+  useEffect(() => {
+    shortcutRef.current = { run: handleRun, submit: () => onSubmit(collectedInputsRef.current) };
+  });
+  const canSubmit = !isWorkspace && !loading;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || !(e.metaKey || e.ctrlKey) || editorMode !== "code") return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.shiftKey) { if (canSubmit) shortcutRef.current.submit(); return; }
+      shortcutRef.current.run();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [editorMode, canSubmit]);
+  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+  const modKey = isMac ? "⌘" : "Ctrl+";
 
-      {/* Deadline banners */}
-      {isHomework && userRole === "teacher" && (
-        <div
-          className="px-4 py-2 border-b flex items-center justify-between text-xs"
-          style={{ background: "var(--indigo-muted)", borderColor: "oklch(55% 0.22 264 / 0.3)", color: "var(--indigo)" }}
+  const urgencyStyle = URGENCY_STYLES[deadlineUrgency];
+  const myLate = mySub ? isSubmittedLate(mySub.submitted_at, assignment.due_at) : false;
+  const panelTitle = showRoster ? t("app.assignment.roster") : t("app.assignment.submissionsPanel");
+  const panelCount = showRoster ? `${submittedCount}/${rosterRows.length}` : (submissions.length > 0 ? String(submissions.length) : "");
+
+  const renderRow = (key: string, name: string, sub: any | null, badge: React.ReactNode, dim = false) => {
+    const selected = !!sub && selectedSubmission?.id === sub.id;
+    return (
+      <li key={key}>
+        <button
+          type="button"
+          disabled={!sub}
+          onClick={() => sub && onSelectSubmission(selected ? null : sub)}
+          className="w-full text-left"
+          style={{
+            display: "flex", flexDirection: "column", gap: 3,
+            padding: "9px 10px", borderRadius: 12, border: "none",
+            background: selected ? "var(--bg-3)" : "transparent",
+            cursor: sub ? "pointer" : "default",
+            opacity: dim ? 0.55 : 1,
+            transition: "background-color 140ms var(--ease)",
+          }}
+          onMouseEnter={e => { if (sub && !selected) e.currentTarget.style.background = "var(--bg-2)"; }}
+          onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "transparent"; }}
         >
-          <span>{t("app.assignment.homeworkBanner", { date: formatDueDate(assignment.due_at), remaining: formatTimeRemaining(assignment.due_at) })}</span>
-          <span style={{ color: "oklch(55% 0.22 264 / 0.7)" }}>
+          <span className="flex items-center justify-between gap-2 w-full">
+            <span className="flex items-center gap-2 min-w-0">
+              <Avatar name={name} size={24} />
+              <span className="text-[13px] font-medium truncate" style={{ color: "var(--text)" }}>
+                {name}
+                {firstSolverId && sub?.user_id === firstSolverId && sub?.status === "success" && (
+                  <span title={t("app.assignment.firstToSolve")} className="ml-1">👑</span>
+                )}
+              </span>
+            </span>
+            {badge}
+          </span>
+          {sub && (
+            <span className="text-[11px] pl-8" style={{ color: "var(--text-3)" }}>
+              {new Date(sub.submitted_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+            </span>
+          )}
+        </button>
+      </li>
+    );
+  };
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "var(--bg-2)" }}>
+      {/* ── Top bar: one row for title, deadline, status, mode, XP ─────── */}
+      <header
+        className="flex items-center gap-3 px-4 shrink-0"
+        style={{ height: 56, background: "var(--bg)", borderBottom: "1px solid var(--border)" }}
+      >
+        <button type="button" onClick={onBack} className="st-icon-btn" title={t("app.assignment.back").replace(/^←\s*/, "")}>
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <h1 className="text-[15px] font-semibold truncate" style={{ color: "var(--text)", letterSpacing: "-0.01em" }}>{assignment.title}</h1>
+
+        {isHomework && (
+          <span
+            className="st-chip"
+            title={formatDueDate(assignment.due_at)}
+            style={{ background: urgencyStyle.bg, color: urgencyStyle.color }}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            {deadlineUrgency === "overdue"
+              ? t("app.deadline.overdue")
+              : <>{formatDueDate(assignment.due_at)} <span style={{ opacity: 0.7, fontWeight: 500 }}>· {formatTimeRemaining(assignment.due_at)}</span></>}
+          </span>
+        )}
+        {isHomework && userRole === "student" && mySub && (
+          <span className="st-chip" style={{ background: myLate ? "var(--amber-10)" : "var(--mint-10)", color: myLate ? "var(--amber-dim)" : "var(--mint-dim)" }}>
+            <Check className="h-3.5 w-3.5" />
+            {myLate ? t("app.classroom.submittedLate") : t("app.classroom.submitted")}
+          </span>
+        )}
+        {isHomework && userRole === "teacher" && (
+          <span className="st-chip">
+            <Users className="h-3.5 w-3.5" style={{ color: "var(--text-3)" }} />
             {groupMembers.length > 0
               ? t("app.assignment.submittedRatio", { submitted: submittedCount, total: groupMembers.length })
               : t("app.assignment.submittedRatioUnknown", { submitted: submittedCount })}
           </span>
+        )}
+
+        <div className="flex-1" />
+
+        <div className="st-seg" role="group" aria-label="Mode">
+          {(["code", "draw"] as const).map(mode => (
+            <button key={mode} type="button" aria-pressed={editorMode === mode} onClick={() => setEditorMode(mode)} className="capitalize">
+              {mode === "code" ? <Code2 className="h-3.5 w-3.5" /> : <PenLine className="h-3.5 w-3.5" />}
+              {mode === "code" ? t("app.assignment.modeCode") : t("app.assignment.modeDraw")}
+            </button>
+          ))}
         </div>
-      )}
-      {isHomework && userRole === "student" && deadlineUrgency !== "none" && (
-        <div
-          className="px-4 py-2 border-b flex items-center justify-between text-xs"
-          style={{
-            background: URGENCY_STYLES[deadlineUrgency].bg,
-            borderColor: "var(--border)",
-            color: URGENCY_STYLES[deadlineUrgency].color,
-          }}
-        >
-          <span>
-            {deadlineUrgency === "overdue"
-              ? t("app.assignment.overdue")
-              : t("app.assignment.dueLine", { date: formatDueDate(assignment.due_at), remaining: formatTimeRemaining(assignment.due_at) })}
+
+        {userRole === "student" && xp != null && (
+          <span className="st-chip" style={{ background: "var(--amber-10)", color: "var(--amber-dim)" }}>
+            <Zap className="h-3.5 w-3.5" style={{ color: "var(--amber)" }} />
+            {t("app.assignment.xp", { xp })}
           </span>
-          {mySub && (
-            <span style={{ color: isSubmittedLate(mySub.submitted_at, assignment.due_at) ? "var(--amber)" : "var(--mint)" }}>
-              {t("app.assignment.submittedAt", { date: new Date(mySub.submitted_at).toLocaleString() })}
-              {isSubmittedLate(mySub.submitted_at, assignment.due_at) ? t("app.assignment.late") : t("app.assignment.onTime")}
-            </span>
-          )}
-        </div>
-      )}
+        )}
+      </header>
 
-      <div className="flex flex-1 overflow-hidden">
-
-        {/* Editor + terminal */}
-        <div
-          className="flex-1 flex flex-col overflow-hidden border-r"
-          style={{ borderColor: "var(--border)", background: "var(--bg)" }}
-        >
-          {/* Mode + file tabs */}
-          <div
-            className="flex items-center justify-between px-3 py-2 border-b"
-            style={{ borderColor: "var(--border)", background: "var(--bg-2)" }}
-          >
-            <div className="flex items-center gap-1">
-              {["code", "draw"].map(mode => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setEditorMode(mode as "code" | "draw")}
-                  className="px-2.5 py-1 rounded-[8px] text-xs font-medium transition-colors capitalize"
-                  style={{
-                    background: editorMode === mode ? "var(--indigo-muted)" : "transparent",
-                    color: editorMode === mode ? "var(--indigo)" : "var(--muted)",
-                    border: editorMode === mode ? "1px solid oklch(55% 0.22 264 / 0.3)" : "1px solid transparent",
-                  }}
-                >
-                  {mode === "code" ? t("app.assignment.modeCode") : t("app.assignment.modeDraw")}
-                </button>
-              ))}
-            </div>
-            {editorMode === "code" && (
-              <div className="flex items-center gap-1">
-                {files.map(f => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => onSelectFile(f.id)}
-                    className="px-2 py-0.5 rounded-[6px] text-xs font-mono transition-colors"
-                    style={{
-                      background: activeFileId === f.id ? "var(--bg)" : "transparent",
-                      color: activeFileId === f.id ? "var(--indigo)" : "var(--muted)",
-                      border: activeFileId === f.id ? "1px solid var(--border)" : "1px solid transparent",
-                    }}
-                  >
-                    {f.name}
+      <div className="flex flex-1 min-h-0 gap-3 p-3">
+        {/* ── Editor column ───────────────────────────────────────────── */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          <section className="st-card flex-1 min-h-0 flex flex-col overflow-hidden">
+            {/* Toolbar: files on the left, actions on the right (code mode only —
+                the whiteboard carries its own floating toolbar) */}
+            <div className={`${editorMode === "code" ? "flex" : "hidden"} items-center gap-2 px-2 shrink-0`} style={{ height: 48, borderBottom: "1px solid var(--border)" }}>
+              {editorMode === "code" ? (
+                <div className="flex items-center gap-1 min-w-0 overflow-x-auto" role="tablist">
+                  {files.map(f => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeFileId === f.id}
+                      onClick={() => onSelectFile(f.id)}
+                      className="st-tab"
+                    >
+                      <span className="st-tab-dot" />
+                      {f.name}
+                    </button>
+                  ))}
+                  <button type="button" onClick={onAddFile} className="st-icon-btn" style={{ width: 28, height: 28 }} title={t("app.modals.newFileTitle")}>
+                    <Plus className="h-3.5 w-3.5" />
                   </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={onAddFile}
-                  className="px-1.5 py-0.5 text-xs rounded-[6px] border transition-colors"
-                  style={{ border: "1px solid var(--border)", color: "var(--subtle)" }}
-                >
-                  +
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Editor area */}
-          <div className="flex-1 min-h-0 overflow-hidden" style={{ background: "var(--bg)" }}>
-            <div className={editorMode === "code" ? "h-full" : "hidden"}>
-              <CodeEditor
-                key={activeFileId || "single-file"}
-                value={code}
-                onChange={setCode}
-                roomId={roomId}
-                userName={userName}
-                userRole={userRole}
-                handRaised={handRaised}
-                className="bg-[var(--bg)]"
-                errorLines={errorLines}
-              />
-            </div>
-            <div className={editorMode === "draw" ? "h-full" : "hidden"}>
-              <DrawingCanvas roomId={drawingRoomId} userName={userName} userRole={userRole} className="h-full" />
-            </div>
-          </div>
-
-          {/* action buttons */}
-          {editorMode === "code" && (
-            <div className="border-t" style={{ borderColor: "var(--border)", background: "var(--bg-2)" }}>
-              <div className="flex items-center gap-2 px-3 py-2">
-                {isRunning ? (
-                  <button
-                    onClick={handleStop}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-[10px] font-semibold transition-all"
-                    style={{ background: "#ef4444", color: "#fff", boxShadow: "0 0 12px #ef444440" }}
-                  >
-                    <Square className="h-3 w-3" />
-                    {t("app.assignment.stop")}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleRun}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-[10px] font-semibold transition-all"
-                    style={{ background: "var(--indigo)", color: "#fff", boxShadow: "0 0 12px oklch(55% 0.22 264 / 0.35)" }}
-                  >
-                    <Play className="h-3 w-3" />
-                    {t("app.assignment.run")}
-                  </button>
-                )}
-                {!isWorkspace && (
-                  <button
-                    onClick={() => onSubmit(collectedInputsRef.current)}
-                    disabled={loading}
-                    className="px-3 py-1.5 text-xs rounded-[10px] border font-medium disabled:opacity-60 transition-colors"
-                    style={{
-                      borderColor: isHomework ? "oklch(55% 0.22 264 / 0.4)" : "var(--border)",
-                      background: isHomework ? "var(--indigo-muted)" : "transparent",
-                      color: isHomework ? "var(--indigo)" : "var(--muted)",
-                    }}
-                  >
-                    {isHomework ? t("app.assignment.submitHomework") : t("app.assignment.submit")}
-                  </button>
-                )}
-                {userRole === "student" && !isWorkspace && (
-                  <button
-                    type="button"
-                    onClick={() => setHandRaised(v => !v)}
-                    className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-[10px] border transition-all"
-                    style={{
-                      borderColor: handRaised ? "var(--amber)" : "var(--border)",
-                      background: handRaised ? "var(--amber-muted)" : "transparent",
-                      color: handRaised ? "var(--amber)" : "var(--muted)",
-                      animation: handRaised ? "pulseDot 2s ease-in-out infinite" : undefined,
-                    }}
-                  >
-                    <LifeBuoy className="h-3 w-3" />
-                    {handRaised ? t("app.assignment.handRaised") : t("app.assignment.askForHelp")}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Hint panel */}
-          {userRole === "student" && failedAttempts >= 3 && (
-            <div
-              className="border-t px-4 py-2.5"
-              style={{ borderColor: "oklch(78% 0.17 85 / 0.3)", background: "var(--amber-muted)" }}
-            >
-              {hint ? (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--amber)" }}>{t("app.assignment.hintLabel")}</span>
-                    <button type="button" onClick={onDismissHint} className="text-[10px]" style={{ color: "var(--subtle)" }}>{t("app.assignment.dismiss")}</button>
-                  </div>
-                  <p className="text-xs leading-relaxed" style={{ color: "var(--text)" }}>{hint}</p>
-                  <p className="text-[10px]" style={{ color: "var(--amber)" }}>{t("app.assignment.hintCost")}</p>
                 </div>
               ) : (
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs" style={{ color: "var(--amber)" }}>
+                <span className="px-2 text-[13px] font-semibold" style={{ color: "var(--text-2)" }}>{t("app.assignment.modeDraw")}</span>
+              )}
+
+              <div className="flex-1" />
+
+              {/* Who's in this file — compact avatar stack instead of a whole row */}
+              {peers.length > 0 && (
+                <div
+                  className="flex items-center pr-1 shrink-0"
+                  title={peers.map(p => p.name + (p.handRaised ? " ✋" : "")).join("\n")}
+                >
+                  {peers.slice(0, 5).map((p, i) => (
+                    <span
+                      key={p.clientId}
+                      className="grid place-items-center rounded-full text-[10px] font-bold text-white"
+                      style={{
+                        width: 24, height: 24, marginLeft: i === 0 ? 0 : -6,
+                        background: p.color,
+                        border: "2px solid var(--bg)",
+                        boxShadow: p.handRaised ? "0 0 0 2px var(--amber)" : undefined,
+                        zIndex: 10 - i,
+                      }}
+                    >
+                      {(p.name.replace(/^(Teacher|Student)\s+/, "").trim()[0] || "?").toUpperCase()}
+                    </span>
+                  ))}
+                  {peers.length > 5 && (
+                    <span className="st-chip" style={{ height: 22, fontSize: 11, marginLeft: 4, padding: "0 7px" }}>+{peers.length - 5}</span>
+                  )}
+                </div>
+              )}
+
+              {editorMode === "code" && (
+                <div className="flex items-center gap-2 shrink-0">
+                  {userRole === "student" && !isWorkspace && (
+                    <button
+                      type="button"
+                      onClick={() => setHandRaised(v => !v)}
+                      className={`st-btn st-btn-sm ${handRaised ? "st-btn-warn" : "st-btn-ghost"}`}
+                      aria-pressed={handRaised}
+                    >
+                      {handRaised
+                        ? <span className="h-2 w-2 rounded-full" style={{ background: "var(--amber)", animation: "pulseDot 1.6s ease-in-out infinite" }} />
+                        : <LifeBuoy className="h-3.5 w-3.5" />}
+                      {handRaised ? t("app.assignment.handRaised") : t("app.assignment.askForHelp")}
+                    </button>
+                  )}
+                  {isRunning ? (
+                    <button type="button" onClick={handleStop} className="st-btn st-btn-secondary" style={{ color: "var(--rose)" }}>
+                      <Square className="h-3 w-3" fill="currentColor" />
+                      {t("app.assignment.stop")}
+                    </button>
+                  ) : (
+                    <button type="button" onClick={handleRun} className={`st-btn ${isWorkspace ? "st-btn-primary" : "st-btn-secondary"}`} title={`${modKey}↵`}>
+                      <Play className="h-3.5 w-3.5" fill="currentColor" />
+                      {t("app.assignment.run")}
+                      <kbd className="st-kbd">{modKey}↵</kbd>
+                    </button>
+                  )}
+                  {!isWorkspace && (
+                    <button
+                      type="button"
+                      onClick={() => onSubmit(collectedInputsRef.current)}
+                      disabled={loading}
+                      className="st-btn st-btn-primary"
+                      title={`${modKey}⇧↵`}
+                    >
+                      {loading
+                        ? <span className="h-3.5 w-3.5 rounded-full border-2 animate-spin" style={{ borderColor: "currentColor", borderTopColor: "transparent" }} />
+                        : <Check className="h-3.5 w-3.5" strokeWidth={2.5} />}
+                      {isHomework ? t("app.assignment.submitHomework") : t("app.assignment.submit")}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Editor / canvas */}
+            <div className="flex-1 min-h-0 overflow-hidden" style={{ background: "var(--editor-bg)" }}>
+              <div className={editorMode === "code" ? "h-full" : "hidden"}>
+                <CodeEditor
+                  key={activeFileId || "single-file"}
+                  value={code}
+                  onChange={setCode}
+                  roomId={roomId}
+                  userName={userName}
+                  userRole={userRole}
+                  handRaised={handRaised}
+                  errorLines={errorLines}
+                  onPeersChange={setPeers}
+                  showPresence={false}
+                />
+              </div>
+              <div className={editorMode === "draw" ? "h-full" : "hidden"}>
+                <DrawingCanvas roomId={drawingRoomId} userName={userName} userRole={userRole} className="h-full" />
+              </div>
+            </div>
+          </section>
+
+          {/* Hint callout — appears once a student is visibly stuck */}
+          {editorMode === "code" && userRole === "student" && failedAttempts >= 3 && (
+            <div
+              className="st-fade-up flex items-start gap-3 mt-3 px-4 py-3 rounded-[16px]"
+              style={{ background: "var(--amber-10)", border: "1px solid var(--amber-muted)" }}
+            >
+              <span className="grid place-items-center h-7 w-7 rounded-full shrink-0" style={{ background: "var(--bg)", color: "var(--amber)" }}>
+                <Lightbulb className="h-4 w-4" />
+              </span>
+              {hint ? (
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12px] font-semibold" style={{ color: "var(--amber-dim)" }}>{t("app.assignment.hintLabel")}</span>
+                    <button type="button" onClick={onDismissHint} className="st-btn st-btn-ghost st-btn-sm" style={{ height: 24 }}>{t("app.assignment.dismiss")}</button>
+                  </div>
+                  <p className="text-[13px] leading-relaxed" style={{ color: "var(--text)" }}>{hint}</p>
+                  <p className="text-[11px]" style={{ color: "var(--amber-dim)" }}>{t("app.assignment.hintCost")}</p>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-between gap-3 min-h-[28px]">
+                  <span className="text-[13px]" style={{ color: "var(--text-2)" }}>
                     {t("app.assignment.stuckPrompt", { count: failedAttempts })}
                   </span>
-                  <button
-                    type="button"
-                    onClick={onGetHint}
-                    disabled={hintLoading}
-                    className="shrink-0 px-2.5 py-1 text-xs rounded-[8px] border transition-colors disabled:opacity-60"
-                    style={{ border: "1px solid var(--amber)", background: "transparent", color: "var(--amber)" }}
-                  >
+                  <button type="button" onClick={onGetHint} disabled={hintLoading} className="st-btn st-btn-secondary st-btn-sm">
                     {hintLoading ? t("app.assignment.thinking") : t("app.assignment.getHint")}
                   </button>
                 </div>
@@ -3133,256 +3240,183 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
             </div>
           )}
 
-          {/* Drag handle */}
-          <div
-            onMouseDown={handleTerminalDragStart}
-            className="h-1 shrink-0 cursor-ns-resize transition-colors"
-            style={{ background: "#ffffff08" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "#ffffff18")}
-            onMouseLeave={e => (e.currentTarget.style.background = "#ffffff08")}
-          />
-
-          {/* Terminal */}
-          <div className="flex flex-col shrink-0" style={{ height: terminalHeight, background: "#0d1117" }}>
-            <div
-              className="flex items-center justify-between px-3 py-1.5 shrink-0"
-              style={{ borderBottom: "1px solid #ffffff12" }}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#555" }}>{t("app.assignment.terminal")}</span>
-                {isRunning && (
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#4ade80", display: "inline-block", animation: "pulseDot 1.4s ease-in-out infinite" }} />
-                )}
-                {awaitingInput && (
-                  <span className="text-[10px]" style={{ color: "#fbbf24" }}>{t("app.assignment.waitingForInput")}</span>
-                )}
-                {pyLoading && (
-                  <span className="text-[10px]" style={{ color: "#fbbf24" }}>{t("app.assignment.downloadingPython")}</span>
-                )}
-                {!isRunning && lastRunInfo !== null && (
-                  <span className="text-[10px] font-mono" style={{ color: lastRunInfo.exitCode === 0 ? "#4ade80" : "#f87171" }}>
-                    {t("app.assignment.exitInfo", { code: lastRunInfo.exitCode, elapsed: lastRunInfo.elapsed })}
-                  </span>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => { setStreamLines([]); runCount.current = 0; setLastRunInfo(null); }}
-                className="text-[10px] transition-colors"
-                style={{ color: "#444" }}
-              >
-                {t("app.assignment.clear")}
-              </button>
-            </div>
-            <div
-              ref={terminalRef}
-              onClick={() => { if (awaitingInput) inputRef.current?.focus(); }}
-              className="flex-1 overflow-auto px-3 py-2 font-mono text-[12.5px] leading-relaxed"
-              style={{ background: "#0d1117" }}
-            >
-              {streamLines.length === 0 && !isRunning ? (
-                <span style={{ color: "#444" }}>{t("app.assignment.terminalEmpty")}</span>
-              ) : (
-                <pre className="whitespace-pre-wrap break-words m-0" style={{ color: "#e2e8f0" }}>
-                  {streamLines.map(line => (
-                    <span
-                      key={line.id}
-                      style={{
-                        color: line.type === "stderr" ? "#f87171" : line.type === "info" ? "#555" : "#e2e8f0",
-                        fontStyle: line.type === "info" ? "italic" : undefined,
-                      }}
-                    >
-                      {line.text}
+          {/* Output */}
+          {editorMode === "code" && (
+            <>
+              <div onMouseDown={handleTerminalDragStart} className="st-grip" role="separator" aria-orientation="horizontal" />
+              <section className="st-card flex flex-col shrink-0 overflow-hidden" style={{ height: terminalHeight }}>
+                <div className="flex items-center justify-between gap-2 px-3 shrink-0" style={{ height: 38, borderBottom: "1px solid var(--border)" }}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <TerminalSquare className="h-3.5 w-3.5" style={{ color: "var(--text-3)" }} />
+                    <span className="text-[12px] font-semibold" style={{ color: "var(--text-2)" }}>{t("app.assignment.output")}</span>
+                    {isRunning && !awaitingInput && (
+                      <span className="st-chip" style={{ height: 20, fontSize: 11, background: "var(--mint-10)", color: "var(--mint-dim)" }}>
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--mint)", animation: "pulseDot 1.4s ease-in-out infinite" }} />
+                        {t("app.assignment.running")}
+                      </span>
+                    )}
+                    {awaitingInput && (
+                      <span className="st-chip" style={{ height: 20, fontSize: 11, background: "var(--amber-10)", color: "var(--amber-dim)" }}>{t("app.assignment.waitingForInput")}</span>
+                    )}
+                    {pyLoading && (
+                      <span className="st-chip" style={{ height: 20, fontSize: 11 }}>{t("app.assignment.downloadingPython")}</span>
+                    )}
+                    {!isRunning && lastRunInfo !== null && (
+                      <span
+                        className="st-chip font-mono"
+                        style={{ height: 20, fontSize: 11, background: lastRunInfo.exitCode === 0 ? "var(--mint-10)" : "var(--rose-10)", color: lastRunInfo.exitCode === 0 ? "var(--mint-dim)" : "var(--rose)" }}
+                      >
+                        {t("app.assignment.exitInfo", { code: lastRunInfo.exitCode, elapsed: lastRunInfo.elapsed })}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setStreamLines([]); runCount.current = 0; setLastRunInfo(null); }}
+                    className="st-icon-btn"
+                    style={{ width: 26, height: 26 }}
+                    title={t("app.assignment.clear")}
+                  >
+                    <Eraser className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div
+                  ref={terminalRef}
+                  onClick={() => { if (awaitingInput) inputRef.current?.focus(); }}
+                  className="flex-1 overflow-auto px-4 py-3 font-mono text-[12.5px] leading-relaxed"
+                  style={{ background: "var(--term-bg)" }}
+                >
+                  {streamLines.length === 0 && !isRunning ? (
+                    <span style={{ color: "var(--term-dim)", fontFamily: "var(--font)" }}>
+                      {t("app.assignment.terminalEmpty")} <kbd className="st-kbd" style={{ background: "var(--bg-3)", fontFamily: "var(--font)" }}>{modKey}↵</kbd>
                     </span>
-                  ))}
-                  {awaitingInput && (
-                    <input
-                      ref={inputRef}
-                      value={inputValue}
-                      onChange={e => setInputValue(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === "Enter") { e.preventDefault(); submitInput(); }
-                      }}
-                      spellCheck={false}
-                      autoComplete="off"
-                      className="m-0 p-0"
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        outline: "none",
-                        color: "#e2e8f0",
-                        font: "inherit",
-                        caretColor: "#4ade80",
-                        minWidth: "1ch",
-                        width: `${Math.max(1, inputValue.length) + 1}ch`,
-                      }}
-                    />
+                  ) : (
+                    <pre className="whitespace-pre-wrap break-words m-0" style={{ color: "var(--term-text)" }}>
+                      {streamLines.map(line => (
+                        <span
+                          key={line.id}
+                          style={{
+                            color: line.type === "stderr" ? "var(--term-err)" : line.type === "info" ? "var(--term-dim)" : "var(--term-text)",
+                            fontStyle: line.type === "info" ? "italic" : undefined,
+                          }}
+                        >
+                          {line.text}
+                        </span>
+                      ))}
+                      {awaitingInput && (
+                        <input
+                          ref={inputRef}
+                          value={inputValue}
+                          onChange={e => setInputValue(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") { e.preventDefault(); submitInput(); }
+                          }}
+                          spellCheck={false}
+                          autoComplete="off"
+                          className="m-0 p-0"
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            outline: "none",
+                            color: "var(--term-text)",
+                            font: "inherit",
+                            caretColor: "var(--editor-caret)",
+                            minWidth: "1ch",
+                            width: `${Math.max(1, inputValue.length) + 1}ch`,
+                          }}
+                        />
+                      )}
+                      {isRunning && !awaitingInput && (
+                        <span className="inline-block w-[7px] h-[14px] align-middle rounded-[1px]" style={{ background: "var(--editor-caret)", animation: "pulseDot 1s step-end infinite" }} />
+                      )}
+                    </pre>
                   )}
-                  {isRunning && !awaitingInput && (
-                    <span className="inline-block w-[7px] h-[14px] align-middle" style={{ background: "#4ade80", animation: "pulseDot 1s step-end infinite" }} />
-                  )}
-                </pre>
-              )}
-            </div>
-          </div>
+                </div>
+              </section>
+            </>
+          )}
         </div>
 
         {/* ── Right panel: submissions / roster ───────────────────────── */}
         {/* Hidden in the personal workspace — nothing is submitted there. */}
-        {!isWorkspace && (
-        <div
-          className="flex flex-col shrink-0 border-l transition-all duration-200"
-          style={{
-            width: rightOpen ? 256 : 32,
-            borderColor: "var(--border)",
-            background: "var(--bg-2)",
-            overflow: "hidden",
-          }}
-        >
-          {rightOpen ? (
-            <>
-              <div
-                className="px-3 py-2.5 border-b flex items-center justify-between shrink-0"
-                style={{ borderColor: "var(--border)" }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setRightOpen(false)}
-                  className="rounded p-0.5 transition-colors"
-                  style={{ color: "var(--subtle)" }}
-                  title={t("app.assignment.collapse")}
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-                <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--subtle)" }}>
-                  {showRoster ? t("app.assignment.roster") : t("app.assignment.submissionsPanel")}
-                </span>
-                {showRoster ? (
-                  <span className="text-[11px] font-mono" style={{ color: submittedCount === rosterRows.length ? "var(--mint)" : "var(--muted)" }}>
-                    {submittedCount}/{rosterRows.length}
+        {!isWorkspace && (rightOpen ? (
+          <aside className="st-card flex flex-col shrink-0 overflow-hidden st-fade-up" style={{ width: 280 }}>
+            <div className="flex items-center justify-between gap-2 pl-4 pr-2 shrink-0" style={{ height: 48, borderBottom: "1px solid var(--border)" }}>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[13px] font-semibold truncate" style={{ color: "var(--text)" }}>{panelTitle}</span>
+                {panelCount && (
+                  <span
+                    className="st-chip font-mono"
+                    style={{ height: 20, fontSize: 11, padding: "0 7px", ...(showRoster && submittedCount === rosterRows.length ? { background: "var(--mint-10)", color: "var(--mint-dim)" } : {}) }}
+                  >
+                    {panelCount}
                   </span>
-                ) : (
-                  submissions.length > 0
-                    ? <span className="text-[11px] font-mono" style={{ color: "var(--muted)" }}>{submissions.length}</span>
-                    : <span />
                 )}
               </div>
+              <button type="button" onClick={() => setRightOpen(false)} className="st-icon-btn" title={t("app.assignment.collapse")}>
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
 
-              {showRoster ? (
-                <ul className="flex-1 overflow-auto">
-                  {rosterRows.map((row: any) => {
-                    const sub = row.sub;
-                    return (
-                      <li
-                        key={row.user_id}
-                        className="px-3 py-2.5 border-b transition-colors text-xs"
-                        style={{
-                          borderColor: "var(--border)",
-                          cursor: sub ? "pointer" : "default",
-                          opacity: sub ? 1 : 0.6,
-                          background: selectedSubmission?.id === sub?.id ? "var(--bg-3)" : "transparent",
-                        }}
-                        onClick={() => sub && onSelectSubmission(selectedSubmission?.id === sub.id ? null : sub)}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Avatar name={row.name || "Student"} size={22} />
-                            <span className="font-medium truncate">
-                              {row.name || t("common.student")}
-                              {firstSolverId && row.sub?.user_id === firstSolverId && row.sub?.status === "success" && (
-                                <span title={t("app.assignment.firstToSolve")} className="ml-1">👑</span>
-                              )}
-                            </span>
-                          </div>
-                          <Badge type={row.submitted ? (row.late ? "timeout" : "success") : "failed"} label={row.submitted ? (row.late ? t("app.assignment.rosterLate") : t("app.assignment.rosterDone")) : t("app.assignment.rosterMissing")} />
-                        </div>
-                        {sub && (
-                          <div className="mt-1 text-[10px]" style={{ color: "var(--subtle)" }}>
-                            {new Date(sub.submitted_at).toLocaleString()}
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : submissions.length === 0 ? (
-                <div className="flex-1 overflow-auto">
-                  <EmptyState
-                    icon={<Inbox className="h-5 w-5" />}
-                    title={t("app.assignment.noSubmissions")}
-                    hint={t("app.assignment.waitingForStudents")}
-                  />
-                </div>
-              ) : (
-                <ul className="flex-1 overflow-auto">
-                  {submissions.map(s => (
-                    <li
-                      key={s.id}
-                      className="px-3 py-2.5 border-b cursor-pointer transition-colors text-xs"
-                      style={{
-                        borderColor: "var(--border)",
-                        background: selectedSubmission?.id === s.id ? "var(--bg-3)" : "transparent",
-                      }}
-                      onClick={() => onSelectSubmission(selectedSubmission?.id === s.id ? null : s)}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Avatar name={s.submitter_name || "?"} size={22} />
-                          <span className="font-medium truncate">
-                            {s.submitter_name || t("app.assignment.unknown")}
-                            {firstSolverId === s.user_id && s.status === "success" && <span className="ml-1">👑</span>}
-                          </span>
-                        </div>
-                        <Badge
-                          type={s.status === "success" ? "success" : s.status === "timeout" ? "timeout" : "failed"}
-                          label={s.status_display || s.status}
-                        />
-                      </div>
-                      <div className="mt-1 text-[10px]" style={{ color: "var(--subtle)" }}>
-                        {new Date(s.submitted_at).toLocaleString()}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setRightOpen(true)}
-              className="flex flex-col items-center justify-center w-full h-full gap-1 transition-colors"
-              style={{ color: "var(--subtle)" }}
-              title={t("app.assignment.expandPanel")}
-            >
-              <span
-                className="text-[10px] font-semibold uppercase tracking-widest"
-                style={{ writingMode: "vertical-rl", color: "var(--subtle)" }}
-              >
-                {showRoster ? t("app.assignment.roster") : t("app.assignment.submissionsPanel")}
-              </span>
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-        )}
-
+            {showRoster ? (
+              <ul className="flex-1 overflow-auto p-1.5">
+                {rosterRows.map((row: any) => renderRow(
+                  row.user_id,
+                  row.name || t("common.student"),
+                  row.sub,
+                  <Badge type={row.submitted ? (row.late ? "timeout" : "success") : (deadlineUrgency === "overdue" ? "failed" : "not-started")} label={row.submitted ? (row.late ? t("app.assignment.rosterLate") : t("app.assignment.rosterDone")) : t("app.assignment.rosterMissing")} />,
+                  !row.sub,
+                ))}
+              </ul>
+            ) : submissions.length === 0 ? (
+              <div className="flex-1 overflow-auto">
+                <EmptyState
+                  icon={<Inbox className="h-5 w-5" />}
+                  title={t("app.assignment.noSubmissions")}
+                  hint={t("app.assignment.waitingForStudents")}
+                />
+              </div>
+            ) : (
+              <ul className="flex-1 overflow-auto p-1.5">
+                {submissions.map(s => renderRow(
+                  s.id,
+                  s.submitter_name || t("app.assignment.unknown"),
+                  s,
+                  <Badge type={s.status === "success" ? "success" : s.status === "timeout" ? "timeout" : "failed"} label={s.status_display || s.status} />,
+                ))}
+              </ul>
+            )}
+          </aside>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setRightOpen(true)}
+            className="st-card flex flex-col items-center justify-start gap-3 pt-3 shrink-0"
+            style={{ width: 44, cursor: "pointer" }}
+            title={t("app.assignment.expandPanel")}
+          >
+            <ChevronLeft className="h-4 w-4" style={{ color: "var(--text-3)" }} />
+            <span className="text-[12px] font-semibold" style={{ writingMode: "vertical-rl", color: "var(--text-3)" }}>
+              {panelTitle}{panelCount ? ` · ${panelCount}` : ""}
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* Submission detail modal */}
       {selectedSubmission && (
         <div
           onClick={() => onSelectSubmission(null)}
-          style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 50,
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-          }}
+          className="st-backdrop"
+          style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
         >
           <div
             onClick={e => e.stopPropagation()}
+            className="st-pop-in"
             style={{
               width: "min(880px, 100%)", maxHeight: "90vh", display: "flex", flexDirection: "column",
-              background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r-lg)", overflow: "hidden",
-              boxShadow: "0 24px 64px rgba(0,0,0,0.45)",
+              background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 22, overflow: "hidden",
+              boxShadow: "var(--shadow-lg)",
             }}
           >
             <SubmissionDetailPanel

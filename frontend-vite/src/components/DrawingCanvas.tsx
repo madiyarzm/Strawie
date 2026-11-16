@@ -22,7 +22,26 @@ const WIDTHS = [
   { value: 12, labelKey: "drawing.sizeThick" },
 ];
 
-const CANVAS_BG = "#020617"; // slate-950
+// Stroke colours are stored as these fixed hex values (shared over Yjs, so
+// they must stay stable across clients). They were picked for a dark board;
+// on the light board we draw them with deeper equivalents, and the default
+// "chalk white" becomes ink. Peers on different themes see the same drawing.
+const LIGHT_DISPLAY: Record<string, string> = {
+  "#e2e8f0": "#1F2937",
+  "#38bdf8": "#0284C7",
+  "#a78bfa": "#7C3AED",
+  "#34d399": "#059669",
+  "#fbbf24": "#D97706",
+  "#fb7185": "#E11D48",
+  "#fb923c": "#EA580C",
+};
+
+const isDarkTheme = () =>
+  typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "dark";
+
+function displayColor(stored: string): string {
+  return isDarkTheme() ? stored : (LIGHT_DISPLAY[stored.toLowerCase()] ?? stored);
+}
 
 interface View {
   scale: number;
@@ -56,7 +75,7 @@ function renderStrokes(
       ctx.strokeStyle = "rgba(0,0,0,1)";
     } else {
       ctx.globalCompositeOperation = "source-over";
-      ctx.strokeStyle = stroke.color;
+      ctx.strokeStyle = displayColor(stroke.color);
     }
 
     const pts = stroke.points;
@@ -141,13 +160,21 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       : [...strokesRef.current, ...live];
   };
 
+  // Repaint when the app theme flips so stroke colours re-map.
+  const [themeTick, setThemeTick] = useState(0);
+  useEffect(() => {
+    const obs = new MutationObserver(() => setThemeTick((n) => n + 1));
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
+  }, []);
+
   // Re-render canvas when committed strokes or peer cursors change
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     renderStrokes(canvas, getAllStrokes(currentStrokeRef.current), viewRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strokes, peerCursors]);
+  }, [strokes, peerCursors, themeTick]);
 
   // Resize observer
   useEffect(() => {
@@ -358,13 +385,30 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     ? "cell"
     : "crosshair";
 
+  const toolBtn = (active: boolean) =>
+    `h-8 w-8 grid place-items-center rounded-full transition-all duration-150 ${active ? "" : "hover:bg-[var(--bg-3)]"}`;
+  const toolBtnStyle = (active: boolean): React.CSSProperties => ({
+    background: active ? "var(--indigo)" : "transparent",
+    color: active ? "var(--on-primary)" : "var(--text-3)",
+  });
+  const divider = <div className="w-px h-5 mx-0.5" style={{ background: "var(--border)" }} />;
+  const floating: React.CSSProperties = {
+    background: "var(--bg)",
+    border: "1px solid var(--border)",
+    boxShadow: "var(--shadow-md)",
+  };
+
   return (
     <div className={`flex flex-col h-full ${className}`}>
-      {/* Canvas area */}
+      {/* Canvas area — a dotted whiteboard that follows the app theme */}
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden"
-        style={{ background: CANVAS_BG }}
+        style={{
+          background: "var(--editor-bg)",
+          backgroundImage: "radial-gradient(var(--border) 1px, transparent 1px)",
+          backgroundSize: "22px 22px",
+        }}
       >
         <canvas
           ref={canvasRef}
@@ -380,7 +424,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         {/* Empty hint */}
         {strokes.length === 0 && peerCursors.every((p) => !p.liveStroke) && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-slate-700 text-sm select-none">
+            <span className="text-sm select-none" style={{ color: "var(--subtle)" }}>
               {t("drawing.startDrawing")}
             </span>
           </div>
@@ -395,16 +439,12 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           return (
             <div
               key={peer.clientId}
-              className="absolute pointer-events-none flex items-center gap-1 whitespace-nowrap"
-              style={{ left: screen.x + 8, top: screen.y + 8 }}
+              className="absolute pointer-events-none whitespace-nowrap"
+              style={{ left: screen.x + 10, top: screen.y + 10 }}
             >
               <span
-                className="h-2.5 w-2.5 rounded-full flex-shrink-0 shadow-sm"
+                className="text-[11px] font-semibold px-1.5 py-0.5 rounded-[4px] text-white shadow-sm"
                 style={{ background: peer.color }}
-              />
-              <span
-                className="text-[11px] font-medium px-1.5 py-0.5 rounded"
-                style={{ background: peer.color + "22", color: peer.color, border: `1px solid ${peer.color}44` }}
               >
                 {peer.name}
               </span>
@@ -412,165 +452,121 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           );
         })}
 
-        {/* Zoom controls overlay */}
-        <div className="absolute bottom-3 right-3 flex items-center gap-0.5 bg-slate-950/80 border border-slate-700 rounded-md px-1 py-0.5 backdrop-blur-sm">
-          <button
-            type="button"
-            onClick={() => zoom(1 / 1.25)}
-            className="h-6 w-6 flex items-center justify-center rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-            title={t("drawing.zoomOut")}
-          >
+        {/* Zoom controls */}
+        <div className="absolute bottom-4 right-4 flex items-center gap-0.5 rounded-full p-1" style={floating}>
+          <button type="button" onClick={() => zoom(1 / 1.25)} className={toolBtn(false)} style={toolBtnStyle(false)} title={t("drawing.zoomOut")}>
             <ZoomOut className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={resetView}
-            className="px-1.5 text-[11px] font-mono text-slate-400 hover:text-slate-200 min-w-[3.5rem] text-center transition-colors"
+            className="px-1.5 h-8 rounded-full text-[11px] font-mono min-w-[3.25rem] text-center transition-colors hover:bg-[var(--bg-3)]"
+            style={{ color: "var(--text-2)" }}
             title={t("drawing.resetView")}
           >
             {Math.round(displayScale * 100)}%
           </button>
-          <button
-            type="button"
-            onClick={() => zoom(1.25)}
-            className="h-6 w-6 flex items-center justify-center rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-            title={t("drawing.zoomIn")}
-          >
+          <button type="button" onClick={() => zoom(1.25)} className={toolBtn(false)} style={toolBtnStyle(false)} title={t("drawing.zoomIn")}>
             <ZoomIn className="h-3.5 w-3.5" />
           </button>
         </div>
 
         {/* Pan mode hint */}
         {isPanMode && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-slate-800/90 border border-slate-700 text-[11px] text-slate-400 pointer-events-none select-none backdrop-blur-sm">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[12px] pointer-events-none select-none" style={{ ...floating, color: "var(--text-2)" }}>
             {t("drawing.panHint")}
           </div>
         )}
 
-        {/* Connected peers indicator */}
+        {/* Connected peers */}
         {peerCursors.length > 0 && (
-          <div className="absolute top-3 right-3 flex items-center gap-1 bg-slate-950/80 border border-slate-700 rounded-md px-2 py-1 backdrop-blur-sm">
+          <div className="absolute top-4 right-4 flex items-center gap-2 rounded-full px-3 h-8" style={floating}>
             {peerCursors.map((peer) => (
-              <div
-                key={peer.clientId}
-                className="flex items-center gap-1"
-                title={peer.name}
-              >
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{ background: peer.color }}
-                />
-                <span className="text-[10px] text-slate-400 max-w-[5rem] truncate">
-                  {peer.name}
-                </span>
+              <div key={peer.clientId} className="flex items-center gap-1.5" title={peer.name}>
+                <span className="h-2 w-2 rounded-full" style={{ background: peer.color }} />
+                <span className="text-[11px] font-medium max-w-[6rem] truncate" style={{ color: "var(--text-2)" }}>{peer.name}</span>
               </div>
             ))}
           </div>
         )}
-      </div>
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-3 px-4 py-2 border-t border-slate-800 bg-slate-950/90 flex-wrap">
-        {/* Tool buttons */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setTool("pen")}
-            title={t("drawing.pen")}
-            className={`h-7 w-7 flex items-center justify-center rounded border transition-colors ${
-              tool === "pen"
-                ? "border-sky-500 bg-slate-900 text-sky-400"
-                : "border-slate-700 bg-slate-950 text-slate-400 hover:bg-slate-900"
-            }`}
-          >
+        {/* Floating toolbar */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full p-1 max-w-[calc(100%-180px)] overflow-x-auto" style={floating}>
+          <button type="button" onClick={() => setTool("pen")} title={t("drawing.pen")} className={toolBtn(tool === "pen")} style={toolBtnStyle(tool === "pen")}>
             <Pencil className="h-3.5 w-3.5" />
           </button>
-          <button
-            type="button"
-            onClick={() => setTool("eraser")}
-            title={t("drawing.eraser")}
-            className={`h-7 w-7 flex items-center justify-center rounded border transition-colors ${
-              tool === "eraser"
-                ? "border-sky-500 bg-slate-900 text-sky-400"
-                : "border-slate-700 bg-slate-950 text-slate-400 hover:bg-slate-900"
-            }`}
-          >
+          <button type="button" onClick={() => setTool("eraser")} title={t("drawing.eraser")} className={toolBtn(tool === "eraser")} style={toolBtnStyle(tool === "eraser")}>
             <Eraser className="h-3.5 w-3.5" />
           </button>
-        </div>
 
-        <div className="w-px h-5 bg-slate-800" />
+          {divider}
 
-        {/* Color palette */}
-        <div className="flex items-center gap-1">
-          {COLORS.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              onClick={() => { setColor(c.value); setTool("pen"); }}
-              title={t(c.labelKey)}
-              className={`h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 ${
-                color === c.value && tool === "pen"
-                  ? "border-sky-400 scale-110"
-                  : "border-slate-700"
-              }`}
-              style={{ background: c.value }}
-            />
-          ))}
-        </div>
+          <div className="flex items-center gap-1 px-1">
+            {COLORS.map((c) => {
+              const active = color === c.value && tool === "pen";
+              return (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => { setColor(c.value); setTool("pen"); }}
+                  title={t(c.labelKey)}
+                  aria-pressed={active}
+                  className="h-5 w-5 rounded-full transition-transform duration-150 hover:scale-110"
+                  style={{
+                    background: displayColor(c.value),
+                    boxShadow: active ? "0 0 0 2px var(--bg), 0 0 0 4px var(--text-3)" : "inset 0 0 0 1px rgba(0,0,0,0.08)",
+                    transform: active ? "scale(1.1)" : undefined,
+                  }}
+                />
+              );
+            })}
+          </div>
 
-        <div className="w-px h-5 bg-slate-800" />
+          {divider}
 
-        {/* Stroke width */}
-        <div className="flex items-center gap-1">
-          {WIDTHS.map((w) => (
-            <button
-              key={w.value}
-              type="button"
-              onClick={() => setStrokeWidth(w.value)}
-              title={t(w.labelKey)}
-              className={`h-7 w-9 flex items-center justify-center rounded border transition-colors ${
-                strokeWidth === w.value
-                  ? "border-sky-500 bg-slate-900"
-                  : "border-slate-700 bg-slate-950 hover:bg-slate-900"
-              }`}
-            >
-              <div
-                className="rounded-full bg-slate-300"
-                style={{ width: Math.min(w.value * 2.5, 28), height: w.value }}
-              />
-            </button>
-          ))}
-        </div>
+          <div className="flex items-center gap-0.5">
+            {WIDTHS.map((w) => (
+              <button
+                key={w.value}
+                type="button"
+                onClick={() => setStrokeWidth(w.value)}
+                title={t(w.labelKey)}
+                className="h-8 w-9 grid place-items-center rounded-full transition-colors hover:bg-[var(--bg-3)]"
+                style={{ background: strokeWidth === w.value ? "var(--bg-3)" : "transparent" }}
+              >
+                <div
+                  className="rounded-full"
+                  style={{ width: Math.min(w.value * 2.5, 22), height: Math.max(2, w.value), background: strokeWidth === w.value ? "var(--text)" : "var(--text-3)" }}
+                />
+              </button>
+            ))}
+          </div>
 
-        <div className="w-px h-5 bg-slate-800" />
+          {divider}
 
-        {/* Clear */}
-        <button
-          type="button"
-          onClick={clearStrokes}
-          title={t("drawing.clearCanvas")}
-          className="h-7 px-2 flex items-center gap-1 rounded border border-slate-700 bg-slate-950 text-slate-400 hover:bg-slate-900 hover:text-red-400 hover:border-red-500/50 transition-colors text-xs"
-        >
-          <Trash2 className="h-3 w-3" />
-          <span>{t("drawing.clear")}</span>
-        </button>
+          <button
+            type="button"
+            onClick={clearStrokes}
+            title={t("drawing.clearCanvas")}
+            className="h-8 px-3 flex items-center gap-1.5 rounded-full text-[12px] font-medium transition-colors hover:bg-[var(--rose-10)] hover:text-[var(--rose)]"
+            style={{ color: "var(--text-3)" }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span>{t("drawing.clear")}</span>
+          </button>
 
-        {/* Open fullscreen */}
-        {!isFullscreen && roomId && (
-          <>
-            <div className="w-px h-5 bg-slate-800" />
+          {!isFullscreen && roomId && (
             <button
               type="button"
               onClick={handleOpenFullscreen}
               title={t("drawing.openInNewTab")}
-              className="h-7 px-2 flex items-center gap-1 rounded border border-slate-700 bg-slate-950 text-slate-400 hover:bg-slate-900 hover:text-sky-400 hover:border-sky-500/50 transition-colors text-xs ml-auto"
+              className={toolBtn(false)}
+              style={toolBtnStyle(false)}
             >
-              <Maximize2 className="h-3 w-3" />
-              <span>{t("drawing.fullscreen")}</span>
+              <Maximize2 className="h-3.5 w-3.5" />
             </button>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

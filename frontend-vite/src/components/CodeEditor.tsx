@@ -42,6 +42,9 @@ interface CodeEditorProps {
    * your edits are still saved locally" instead of silence.
    */
   onCollabStatusChange?: (status: CollabStatus) => void;
+  /** Render the built-in presence strip. Hosts that show peers elsewhere
+   *  (e.g. in their own toolbar via onPeersChange) can turn it off. */
+  showPresence?: boolean;
 }
 
 const setErrorLinesEffect = StateEffect.define<number[]>();
@@ -76,70 +79,72 @@ const pythonSnippets = (t: TFunction) => [
   { label: "if", type: "keyword", apply: "if ", detail: t("editor.keyword"), info: t("editor.ifInfo") },
 ];
 
+// Colours come from CSS variables (index.css) so the editor follows the app
+// theme: light uses the landing page's syntax palette, dark a warm neutral.
 const strawieEditorTheme = EditorView.theme({
   "&": {
-    backgroundColor: "#0d1117",
-    color: "#e2e8f0",
+    backgroundColor: "var(--editor-bg)",
+    color: "var(--syn-ink)",
     height: "100%",
   },
+  "&.cm-focused": { outline: "none" },
   ".cm-content": {
-    caretColor: "#818cf8",
-    fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace",
+    caretColor: "var(--editor-caret)",
+    fontFamily: "var(--mono)",
+    padding: "14px 0",
   },
-  ".cm-cursor, .cm-dropCursor": { borderLeftColor: "#818cf8" },
+  ".cm-line": { padding: "0 18px 0 14px" },
+  ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--editor-caret)", borderLeftWidth: "2px" },
   "&.cm-focused .cm-selectionBackground, ::selection": {
-    backgroundColor: "#818cf830",
+    backgroundColor: "var(--editor-select)",
   },
-  ".cm-selectionBackground": { backgroundColor: "#818cf820" },
-  ".cm-activeLine": { backgroundColor: "#ffffff07" },
-  ".cm-activeLineGutter": { backgroundColor: "#ffffff07", color: "#94a3b8" },
+  ".cm-selectionBackground": { backgroundColor: "var(--editor-select)" },
+  ".cm-activeLine": { backgroundColor: "var(--editor-active)" },
+  ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--text-2)" },
   ".cm-gutters": {
-    backgroundColor: "#0d1117",
-    color: "#475569",
+    backgroundColor: "var(--editor-gutter)",
+    color: "var(--editor-gutter-text)",
     border: "none",
-    borderRight: "1px solid #1e293b",
+    borderRight: "1px solid var(--border)",
   },
-  ".cm-lineNumbers .cm-gutterElement": { padding: "0 12px 0 8px" },
-  ".cm-scroller": { overflow: "auto" },
-  ".cm-error-line": { backgroundColor: "#f8717120 !important", borderLeft: "2px solid #f87171" },
-  ".cm-matchingBracket": { backgroundColor: "#818cf840", outline: "1px solid #818cf880" },
+  ".cm-gutter": { fontFamily: "var(--mono)" },
+  ".cm-lineNumbers .cm-gutterElement": { padding: "0 12px 0 16px", minWidth: "44px" },
+  ".cm-scroller": { overflow: "auto", lineHeight: "1.7" },
+  ".cm-error-line": { backgroundColor: "var(--rose-10) !important", boxShadow: "inset 2px 0 0 var(--rose)" },
+  ".cm-matchingBracket": { backgroundColor: "var(--editor-select)", outline: "none", borderRadius: "2px" },
   ".cm-tooltip": {
-    backgroundColor: "#1e293b",
-    border: "1px solid #334155",
-    borderRadius: "6px",
+    backgroundColor: "var(--bg)",
+    color: "var(--text)",
+    border: "1px solid var(--border)",
+    borderRadius: "12px",
+    boxShadow: "var(--shadow-lg)",
+    overflow: "hidden",
   },
+  ".cm-tooltip-autocomplete ul": { fontFamily: "var(--mono)", padding: "4px" },
+  ".cm-tooltip-autocomplete ul li": { borderRadius: "8px", padding: "3px 8px !important" },
   ".cm-tooltip-autocomplete ul li[aria-selected]": {
-    backgroundColor: "#818cf820",
-    color: "#e2e8f0",
+    backgroundColor: "var(--bg-3)",
+    color: "var(--text)",
   },
-}, { dark: true });
+  ".cm-completionDetail": { color: "var(--text-3)", fontStyle: "normal", marginLeft: "8px" },
+  ".cm-completionInfo": { padding: "8px 10px", fontFamily: "var(--font)", fontSize: "12px" },
+});
 
 const strawieHighlight = HighlightStyle.define([
-  { tag: t.comment, color: "#475569", fontStyle: "italic" },
-  { tag: [t.lineComment, t.blockComment], color: "#475569", fontStyle: "italic" },
-  { tag: t.keyword, color: "#818cf8", fontWeight: "600" },
-  { tag: [t.controlKeyword, t.operatorKeyword], color: "#a78bfa", fontWeight: "600" },
-  { tag: [t.definitionKeyword, t.moduleKeyword], color: "#818cf8" },
-  { tag: t.string, color: "#34d399" },
-  { tag: [t.special(t.string), t.regexp], color: "#2dd4bf" },
-  { tag: [t.number, t.integer, t.float], color: "#fb923c" },
-  { tag: [t.bool, t.null], color: "#f472b6" },
-  { tag: t.function(t.variableName), color: "#38bdf8" },
-  { tag: t.function(t.propertyName), color: "#38bdf8" },
-  { tag: t.definition(t.function(t.variableName)), color: "#38bdf8", fontWeight: "600" },
-  { tag: t.definition(t.variableName), color: "#e2e8f0" },
-  { tag: t.variableName, color: "#e2e8f0" },
-  { tag: t.propertyName, color: "#94a3b8" },
-  { tag: [t.className, t.definition(t.className)], color: "#fbbf24", fontWeight: "600" },
-  { tag: t.typeName, color: "#fbbf24" },
-  { tag: t.operator, color: "#94a3b8" },
-  { tag: [t.bracket, t.paren, t.squareBracket, t.angleBracket], color: "#94a3b8" },
-  { tag: t.punctuation, color: "#64748b" },
-  { tag: t.separator, color: "#64748b" },
-  { tag: t.self, color: "#f472b6", fontStyle: "italic" },
-  { tag: t.atom, color: "#f472b6" },
-  { tag: t.meta, color: "#64748b" },
-  { tag: t.invalid, color: "#f87171", textDecoration: "underline" },
+  { tag: [t.comment, t.lineComment, t.blockComment], color: "var(--syn-comment)", fontStyle: "italic" },
+  { tag: [t.keyword, t.controlKeyword, t.operatorKeyword, t.definitionKeyword, t.moduleKeyword], color: "var(--syn-keyword)", fontWeight: "500" },
+  { tag: t.string, color: "var(--syn-string)" },
+  { tag: [t.special(t.string), t.regexp], color: "var(--syn-string)" },
+  { tag: [t.number, t.integer, t.float], color: "var(--syn-number)" },
+  { tag: [t.bool, t.null, t.atom], color: "var(--syn-const)" },
+  { tag: [t.function(t.variableName), t.function(t.propertyName)], color: "var(--syn-fn)" },
+  { tag: t.definition(t.function(t.variableName)), color: "var(--syn-fn)", fontWeight: "600" },
+  { tag: [t.definition(t.variableName), t.variableName], color: "var(--syn-ink)" },
+  { tag: t.propertyName, color: "var(--syn-ink)" },
+  { tag: [t.className, t.definition(t.className), t.typeName], color: "var(--syn-class)", fontWeight: "600" },
+  { tag: [t.operator, t.bracket, t.paren, t.squareBracket, t.angleBracket, t.punctuation, t.separator, t.meta], color: "var(--syn-punct)" },
+  { tag: t.self, color: "var(--syn-const)", fontStyle: "italic" },
+  { tag: t.invalid, color: "var(--rose)", textDecoration: "underline" },
 ]);
 
 const strawieTheme = [strawieEditorTheme, syntaxHighlighting(strawieHighlight)];
@@ -155,6 +160,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onPeersChange,
   errorLines,
   onCollabStatusChange,
+  showPresence = true,
 }) => {
   const { t } = useTranslation();
   const [ydoc] = useState<Y.Doc>(() => new Y.Doc());
@@ -269,32 +275,37 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
   return (
     <div className="h-full flex flex-col">
-      {/* Presence bar: always rendered to avoid layout shift */}
-      <div className="flex items-center gap-3 px-3 h-6 min-h-[24px] border-b border-slate-800 bg-[#0d1117] text-[10px] text-slate-400">
+      {/* Presence strip: who's in this file. Always rendered (fixed height)
+          so joining peers never shift the code. */}
+      {showPresence && <div
+        className="flex items-center gap-1.5 px-3 h-8 min-h-[32px] overflow-x-auto"
+        style={{ background: "var(--editor-bg)", borderBottom: "1px solid var(--border)" }}
+      >
         {peers.map((p) => (
           <span
             key={p.clientId}
-            className={`flex items-center gap-1 ${p.isSelf ? "text-slate-300" : "text-slate-400"}`}
+            className="inline-flex items-center gap-1.5 h-[22px] px-2 rounded-full text-[11px] font-medium whitespace-nowrap"
+            style={{
+              background: p.isSelf ? "var(--bg-3)" : "transparent",
+              color: p.isSelf ? "var(--text-2)" : "var(--text-3)",
+            }}
           >
-            <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ backgroundColor: p.color }}
-            />
+            <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
             {p.name}
             {p.handRaised && (
               <LifeBuoy
                 className="h-3 w-3"
-                style={{ color: "var(--amber, #f59e0b)" }}
+                style={{ color: "var(--amber)" }}
                 aria-label={t("editor.handRaised")}
               />
             )}
           </span>
         ))}
-      </div>
+      </div>}
       <CodeMirror
         key={`${roomId || "local"}:${awareness ? "awareness" : "plain"}`}
         height="100%"
-        className={`flex-1 min-h-0 text-[13px] md:text-sm font-mono ${className}`}
+        className={`flex-1 min-h-0 text-[13px] font-mono ${className}`}
         theme="none"
         extensions={extensions}
         onCreateEditor={(view) => { viewRef.current = view; }}
