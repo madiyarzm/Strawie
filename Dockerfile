@@ -23,9 +23,6 @@ COPY --from=frontend-builder /build/frontend-vite/dist ./frontend
 
 EXPOSE 8000
 
-# Subprocess sandbox — no Docker daemon available inside Render containers.
-ENV SANDBOX_USE_DOCKER=false
-
 # startup.py: stamps DB at head if no alembic_version exists, then runs upgrade head.
 # Uses ; (not &&) so uvicorn always starts even if the migration step errors.
 COPY startup.py ./

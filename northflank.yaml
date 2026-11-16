@@ -19,7 +19,6 @@
 #      Resource plan:    Developer Sandbox  (free)
 # 4. Add environment variables (Northflank UI → lambda-app → Environment):
 #      ENV=production
-#      SANDBOX_USE_DOCKER=false
 #      DATABASE_URL=<Supabase direct connection string, port 5432>
 #      GOOGLE_CLIENT_ID=<from Google Cloud Console>
 #      GOOGLE_CLIENT_SECRET=<from Google Cloud Console>

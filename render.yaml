@@ -34,5 +34,3 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: SANDBOX_USE_DOCKER
-        value: "false"

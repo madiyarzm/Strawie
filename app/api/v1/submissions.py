@@ -56,7 +56,7 @@ def create_submission_endpoint(
     current_user: CurrentUser,
     db: DBSession,
 ) -> SubmissionRead:
-    """Create a new submission: run code in sandbox and save result."""
+    """Store a submission. The code already ran in the browser; the server never executes it."""
     try:
         submission = create_submission(
             db,

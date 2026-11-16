@@ -49,15 +49,6 @@ export const apiClient = {
   delete: (path: string) => api("DELETE", path),
 };
 
-export function getSandboxWsUrl(): string {
-  // Same-origin WS — cookies travel with the handshake automatically.
-  const httpBase = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
-  const wsBase = httpBase
-    ? httpBase.replace(/^http/, "ws")
-    : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
-  return `${wsBase}/ws/sandbox/run`;
-}
-
 // --- Health ---
 
 export async function healthCheck(): Promise<any | null> {
@@ -289,8 +280,3 @@ export async function createSubmission(
   return apiClient.post("/api/v1/submissions/", body);
 }
 
-// --- Sandbox ---
-
-export async function runSandbox(code: string, stdin = ""): Promise<any> {
-  return apiClient.post("/api/v1/sandbox/run", { code, stdin });
-}

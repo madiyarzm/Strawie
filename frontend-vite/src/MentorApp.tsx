@@ -19,7 +19,6 @@ import {
   getClassroomActiveCounts,
   getMyCosmetics,
   getMyStats,
-  getSandboxWsUrl,
   joinGroup,
   leaveGroup,
   listAllUsers,
@@ -43,8 +42,10 @@ import { Confetti } from "./components/Confetti";
 import {
   onPyodideProgress,
   runForSubmission,
+  startRun,
   warmupPyodide,
 } from "./lib/pyodideRunner";
+import type { RunHandle } from "./lib/pyodideRunner";
 import { ChalkLogo } from "./components/Logo";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { Avatar } from "./components/Avatar";
@@ -2724,7 +2725,12 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
   const [inputValue, setInputValue] = useState("");
   const terminalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+  // The program currently running in the browser's Python worker.
+  const runRef = useRef<RunHandle | null>(null);
+  // Output arrives in many small chunks; buffer and flush once per frame so a
+  // print-heavy loop doesn't re-render the terminal thousands of times.
+  const pendingOutRef = useRef<{ text: string; type: StreamLine["type"] }[]>([]);
+  const flushFrameRef = useRef<number | null>(null);
   // Inputs the student typed at input() prompts during the interactive Run.
   // Replayed as stdin when submitting so grading sees the same input the
   // student tested with — otherwise input() programs get an empty stdin and
@@ -2732,7 +2738,6 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
   const collectedInputsRef = useRef<string[]>([]);
   const lineId = useRef(0);
   const runCount = useRef(0);
-  const runStartRef = useRef(0);
   const dragStateRef = useRef<{ startY: number; startH: number } | null>(null);
 
   useEffect(() => {
@@ -2746,9 +2751,12 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
     if (awaitingInput) inputRef.current?.focus();
   }, [awaitingInput]);
 
-  // Close any open run socket when leaving the assignment.
+  // Stop any running program when leaving the assignment.
   useEffect(() => {
-    return () => { wsRef.current?.close(); };
+    return () => {
+      runRef.current?.stop();
+      if (flushFrameRef.current !== null) cancelAnimationFrame(flushFrameRef.current);
+    };
   }, []);
 
   // Begin downloading Pyodide as soon as the assignment view mounts so the
@@ -2757,18 +2765,36 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
     warmupPyodide();
     const off = onPyodideProgress((e) => {
       if (e.kind === "loading") setPyLoading(true);
-      if (e.kind === "ready") setPyLoading(false);
+      if (e.kind === "ready" || e.kind === "failed") setPyLoading(false);
     });
     return off;
   }, []);
 
-  const appendLine = (text: string, type: StreamLine["type"]) => {
-    setStreamLines(prev => [...prev, { id: lineId.current++, text, type }]);
+  const flushOutput = () => {
+    flushFrameRef.current = null;
+    const pending = pendingOutRef.current;
+    if (pending.length === 0) return;
+    pendingOutRef.current = [];
+    // Merge consecutive chunks of the same stream into one line entry.
+    const merged: { text: string; type: StreamLine["type"] }[] = [];
+    for (const p of pending) {
+      const last = merged[merged.length - 1];
+      if (last && last.type === p.type) last.text += p.text;
+      else merged.push({ ...p });
+    }
+    setStreamLines(prev => [...prev, ...merged.map(m => ({ id: lineId.current++, text: m.text, type: m.type }))]);
   };
 
-  // Run the code on the server's interactive sandbox. Output streams back
-  // over the WebSocket; when the program hits input(), the server sends an
-  // input_request and we let the user type a line right in the terminal.
+  const endsWithNewlineRef = useRef(true);
+  const appendLine = (text: string, type: StreamLine["type"]) => {
+    if (text) endsWithNewlineRef.current = text.endsWith("\n");
+    pendingOutRef.current.push({ text, type });
+    if (flushFrameRef.current === null) flushFrameRef.current = requestAnimationFrame(flushOutput);
+  };
+
+  // Run the code in the browser (Pyodide in a Web Worker). Nothing is sent to
+  // the server. When the program calls input(), the terminal shows an input
+  // line and the program waits until the student presses Enter.
   const handleRun = () => {
     if (isRunning) return;
 
@@ -2777,7 +2803,8 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
     if (thisRun === 1) {
       setStreamLines([]);
     } else {
-      appendLine(`${t("app.assignment.runSeparator", { n: thisRun })}\n`, "info");
+      const lead = endsWithNewlineRef.current ? "" : "\n";
+      appendLine(`${lead}${t("app.assignment.runSeparator", { n: thisRun })}\n`, "info");
     }
     setIsRunning(true);
     setLastRunInfo(null);
@@ -2785,56 +2812,28 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
     setInputValue("");
     // Fresh run: start collecting this run's input() lines from scratch.
     collectedInputsRef.current = [];
-    runStartRef.current = Date.now();
 
-    let ws: WebSocket;
-    try {
-      ws = new WebSocket(getSandboxWsUrl());
-    } catch {
-      appendLine(`${t("app.assignment.runConnectionFailed")}\n`, "stderr");
-      setIsRunning(false);
-      return;
-    }
-    wsRef.current = ws;
-
-    ws.onopen = () => ws.send(JSON.stringify({ code }));
-
-    ws.onmessage = (ev) => {
-      let msg: any;
-      try { msg = JSON.parse(ev.data); } catch { return; }
-      if (msg.type === "stdout") {
-        appendLine(msg.text, "stdout");
-      } else if (msg.type === "stderr") {
-        appendLine(msg.text, "stderr");
-      } else if (msg.type === "input_request") {
-        if (msg.prompt) appendLine(msg.prompt, "stdout");
-        setAwaitingInput(true);
-      } else if (msg.type === "done") {
-        const elapsed = parseFloat(((Date.now() - runStartRef.current) / 1000).toFixed(2));
-        setLastRunInfo({ exitCode: msg.exit_code ?? 0, elapsed });
-        setIsRunning(false);
-        setAwaitingInput(false);
-        ws.close();
-      }
-    };
-
-    ws.onerror = () => {
-      appendLine(`${t("app.assignment.runConnectionError")}\n`, "stderr");
-    };
-
-    ws.onclose = () => {
+    const handle = startRun({
+      code,
+      onOutput: e => appendLine(e.text, e.type),
+      onInputRequest: () => setAwaitingInput(true),
+    });
+    runRef.current = handle;
+    void handle.done.then(result => {
+      if (runRef.current !== handle) return;
+      runRef.current = null;
+      setLastRunInfo({ exitCode: result.exit_code, elapsed: result.elapsed });
       setIsRunning(false);
       setAwaitingInput(false);
-      if (wsRef.current === ws) wsRef.current = null;
-    };
+    });
   };
 
   // Send the current input line to the running program and echo it locally
   // so the terminal reads like one continuous session.
   const submitInput = () => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN || !awaitingInput) return;
-    ws.send(JSON.stringify({ type: "input_response", value: inputValue }));
+    const handle = runRef.current;
+    if (!handle || !awaitingInput) return;
+    handle.sendInput(inputValue);
     appendLine(inputValue + "\n", "stdout");
     // Remember this line so it can be replayed as stdin on submit.
     collectedInputsRef.current.push(inputValue);
@@ -2842,12 +2841,11 @@ const AssignmentView: React.FC<AssignmentViewProps> = ({
     setAwaitingInput(false);
   };
 
-  // Closing the socket makes the server kill the subprocess.
+  // Interrupts the program (like Ctrl+C); the worker is replaced if it hangs.
   const handleStop = () => {
     if (!isRunning) return;
-    wsRef.current?.close();
+    runRef.current?.stop();
     appendLine("^C\n", "stderr");
-    setIsRunning(false);
     setAwaitingInput(false);
   };
 

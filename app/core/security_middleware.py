@@ -24,12 +24,17 @@ from starlette.types import ASGIApp
 # What each directive does:
 #   default-src 'self'        — everything not otherwise specified must come
 #                               from our own origin.
-#   script-src                — Pyodide's loader is fetched from jsdelivr; we
-#                               pin its SHA-384 via SRI in pyodideRunner.ts
-#                               so a compromised CDN can't sneak in a
-#                               different script. 'wasm-unsafe-eval' is
-#                               required to compile WebAssembly modules
-#                               (the Python interpreter).
+#   script-src                — Pyodide runs in a Web Worker
+#                               (public/py-worker.js). The worker fetches the
+#                               loader from jsdelivr, checks its SHA-384
+#                               against a pinned hash, and only then runs it
+#                               from a blob: URL, so a compromised CDN can't
+#                               swap the loader. blob: is needed for that step;
+#                               blob URLs can only be minted by our own
+#                               scripts. jsdelivr stays for the interpreter
+#                               files the loader pulls in. 'wasm-unsafe-eval'
+#                               is required to compile the WebAssembly
+#                               interpreter.
 #   style-src                 — 'unsafe-inline' covers Tailwind + dynamic
 #                               style attributes in MentorApp.tsx.
 #   img-src https:            — Google profile pictures and similar.
@@ -45,7 +50,7 @@ from starlette.types import ASGIApp
 _PROD_CSP = "; ".join(
     [
         "default-src 'self'",
-        "script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'",
+        "script-src 'self' blob: https://cdn.jsdelivr.net 'wasm-unsafe-eval'",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: https:",
         "font-src 'self' data:",
@@ -73,6 +78,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         headers.setdefault("X-Frame-Options", "DENY")
         headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+        # Cross-origin isolation. Required for SharedArrayBuffer, which lets
+        # the Python worker pause on input() until the student types a line,
+        # and lets Stop interrupt a running program. It also stops other
+        # sites from holding a reference to our window or embedding our
+        # resources. Every cross-origin resource we load (the Pyodide CDN)
+        # sends Cross-Origin-Resource-Policy: cross-origin, so nothing breaks.
+        headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+        headers.setdefault("Cross-Origin-Embedder-Policy", "require-corp")
+        headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
         if self._is_production:
             headers.setdefault("Content-Security-Policy", _PROD_CSP)
             headers.setdefault(
