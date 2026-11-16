@@ -58,6 +58,7 @@ class RoomPolicy:
     classroom_id: Optional[uuid.UUID] = None
     assignment_id: Optional[uuid.UUID] = None
     lesson_id: Optional[uuid.UUID] = None
+    user_id: Optional[uuid.UUID] = None  # personal workspace owner
     # Fills a brand-new, empty document. None = start empty.
     seed: Optional[Callable[[Doc], None]] = None
     # Or: build a brand-new document from another room's current content.
@@ -89,6 +90,13 @@ def policy_for_room(db: Session, room_id: str) -> Optional[RoomPolicy]:
     lesson_room = lesson_rooms.parse_lesson_room(room_id)
     if lesson_room is not None:
         return _lesson_policy(db, lesson_room)
+
+    from app.core.workspace_rooms import parse_workspace_room
+
+    workspace = parse_workspace_room(room_id)
+    if workspace is not None:
+        seed = lesson_rooms.seed_board if workspace.kind == "page" else None
+        return RoomPolicy(persist=True, user_id=workspace.owner_id, seed=seed)
 
     key = _parse_room_id(room_id)
     if key is None:
@@ -164,7 +172,7 @@ def can_create_room(db: Session, policy: RoomPolicy) -> bool:
 def save_state(db: Session, room_id: str, policy: RoomPolicy, state: bytes) -> None:
     if not policy.persist:
         return
-    has_owner = policy.lesson_id is not None or (
+    has_owner = policy.lesson_id is not None or policy.user_id is not None or (
         policy.classroom_id is not None and policy.assignment_id is not None
     )
     if not has_owner:
@@ -176,6 +184,7 @@ def save_state(db: Session, room_id: str, policy: RoomPolicy, state: bytes) -> N
             classroom_id=policy.classroom_id,
             assignment_id=policy.assignment_id,
             lesson_id=policy.lesson_id,
+            user_id=policy.user_id,
             state=state,
         )
         db.add(row)

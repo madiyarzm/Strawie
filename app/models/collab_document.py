@@ -30,12 +30,16 @@ class CollabDocument(Base):
     __tablename__ = "collab_documents"
 
     room_id: Mapped[str] = mapped_column(String(200), primary_key=True)
-    # Exactly one owner: an (older) classroom assignment, or a lesson.
+    # Exactly one owner: an (older) classroom assignment, a lesson, or a
+    # user's personal workspace.
     classroom_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("classrooms.id", ondelete="CASCADE"), nullable=True, index=True
     )
     assignment_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("assignments.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
     lesson_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("lessons.id", ondelete="CASCADE"), nullable=True, index=True

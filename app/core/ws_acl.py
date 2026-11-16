@@ -94,6 +94,12 @@ def user_can_join_room(db: Session, user_id: str, room_id: str) -> bool:
     if lesson_room is not None:
         return user_can_join_lesson_room(db, user, lesson_room)
 
+    from app.core.workspace_rooms import parse_workspace_room, user_can_join_workspace_room
+
+    workspace = parse_workspace_room(room_id)
+    if workspace is not None:
+        return user_can_join_workspace_room(user, workspace)
+
     key = _parse_room_id(room_id)
     if not key:
         return False

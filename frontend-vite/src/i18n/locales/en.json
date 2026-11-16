@@ -514,6 +514,7 @@
     "ifInfo": "Conditional branch: if condition:"
   },
   "lessons": {
+    "workspace": {"title": "My workspace", "private": "Only you can see this", "hint": "Try ideas here. Everything is saved, and ▶ runs a block in your browser."},
     "nav": {
       "home": "Home",
       "overview": "Overview",
@@ -522,6 +523,7 @@
       "olderClassrooms": "Older classrooms"
     },
     "review": {
+      "noneTitle": "Nothing to review",
       "title": "Review",
       "pick": "Homework from your recent lessons.",
       "none": "No homework given in the last two weeks.",

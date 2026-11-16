@@ -51,7 +51,7 @@ import { ChalkLogo } from "./components/Logo";
 import { SUPPORTED_LANGUAGES } from "./i18n";
 import { GroupScreen, GroupSheet, HomeScreen } from "./lessons/HomeScreens";
 import type { Nav as LessonNav } from "./lessons/HomeScreens";
-import { HomeworkScreen, LessonScreen, ReviewScreen } from "./lessons/LessonScreens";
+import { HomeworkScreen, LessonScreen, ReviewScreen, WorkspaceScreen } from "./lessons/LessonScreens";
 import type { Group as LessonGroup } from "./lessons/api";
 import { Avatar } from "./components/Avatar";
 import { Badge } from "./components/Badge";
@@ -741,7 +741,7 @@ export const MentorApp: React.FC = () => {
       await deleteGroup(groupId);
       setGroups(prev => prev.filter(g => g.id !== groupId));
       setGroupClassrooms(prev => { const next = { ...prev }; delete next[groupId]; return next; });
-      if (currentClassroom?.group_id === groupId) { setCurrentClassroom(null); setView("dashboard"); }
+      if (currentClassroom?.group_id === groupId) { setCurrentClassroom(null); setView("home"); }
     } catch (e: any) { setError(e.message || t("app.errors.deleteGroup")); }
   };
 
@@ -752,7 +752,7 @@ export const MentorApp: React.FC = () => {
       await leaveGroup(groupId);
       setGroups(prev => prev.filter(g => g.id !== groupId));
       setGroupClassrooms(prev => { const next = { ...prev }; delete next[groupId]; return next; });
-      if (currentClassroom?.group_id === groupId) { setCurrentClassroom(null); setView("dashboard"); }
+      if (currentClassroom?.group_id === groupId) { setCurrentClassroom(null); setView("home"); }
     } catch (e: any) { setError(e.message || t("app.errors.leaveGroup", { defaultValue: "Could not leave group" })); }
   };
 
@@ -762,7 +762,7 @@ export const MentorApp: React.FC = () => {
     try {
       await deleteClassroom(classroomId);
       setGroupClassrooms(prev => ({ ...prev, [groupId]: (prev[groupId] || []).filter((c: any) => c.id !== classroomId) }));
-      if (currentClassroom?.id === classroomId) { setCurrentClassroom(null); setView("dashboard"); }
+      if (currentClassroom?.id === classroomId) { setCurrentClassroom(null); setView("home"); }
     } catch (e: any) { setError(e.message || t("app.errors.deleteClassroom")); }
   };
 
@@ -852,16 +852,10 @@ export const MentorApp: React.FC = () => {
   // Open the student's personal workspace — an ephemeral, solo scratchpad.
   // Seeds a starter file only the first time so navigating away and back
   // keeps the code for the session (a full refresh clears it, by design).
+  // The personal workspace is a private notebook page saved on the server
+  // (room "workspace:<user>"); see lessons/LessonScreens.tsx.
   const openWorkspace = () => {
-    setSelectedSubmission(null);
     setError(null);
-    if (!files.some(f => f.id === "workspace-main")) {
-      const starter = t("app.workspace.starter");
-      const file: EditorFile = { id: "workspace-main", name: "main.py", content: starter };
-      setFiles([file]);
-      setActiveFileId(file.id);
-      setCode(starter);
-    }
     setView("workspace");
   };
 
@@ -1082,16 +1076,12 @@ export const MentorApp: React.FC = () => {
   const teacherNav = [
     { id: "home" as View, label: t("lessons.nav.home", { defaultValue: "Home" }), icon: HOME_ICON },
     { id: "review" as View, label: t("lessons.review.title", { defaultValue: "Review" }), icon: REVIEW_ICON },
-    { id: "dashboard" as View, label: t("lessons.nav.overview", { defaultValue: "Overview" }), icon: "M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" },
-    { id: "classroom" as View, label: t("app.nav.classroom"), icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
-    { id: "submissions" as View, label: t("app.nav.submissions"), icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
+    { id: "workspace" as View, label: t("app.nav.workspace"), icon: "M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm0 3h16" },
   ];
   const studentNav = [
     { id: "home" as View, label: t("lessons.nav.home", { defaultValue: "Home" }), icon: HOME_ICON },
-    { id: "dashboard" as View, label: t("lessons.nav.profile", { defaultValue: "Profile" }), icon: PROFILE_ICON },
     { id: "workspace" as View, label: t("app.nav.workspace"), icon: "M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm0 3h16" },
-    { id: "classroom" as View, label: t("app.nav.classroom"), icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
-    { id: "assignment" as View, label: t("app.nav.editor"), icon: "M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" },
+    { id: "dashboard" as View, label: t("lessons.nav.profile", { defaultValue: "Profile" }), icon: PROFILE_ICON },
   ];
   const navItems = effectiveRole === "teacher" ? teacherNav : studentNav;
   // classroom nav item links to classroom view only if a classroom is selected
@@ -1352,7 +1342,7 @@ export const MentorApp: React.FC = () => {
               activeCount={classroomActiveCounts[currentClassroom.id] || 0}
               onCreateAssignment={handleCreateAssignment}
               onOpenAssignment={openAssignment}
-              onBack={() => setView("dashboard")}
+              onBack={() => setView("home")}
               onDelete={() => handleDeleteClassroom(currentClassroom.id, currentClassroom.name, currentClassroom.group_id)}
             />
           )}
@@ -1369,7 +1359,10 @@ export const MentorApp: React.FC = () => {
               onSaveFeedback={handleSaveFeedback}
             />
           )}
-          {(view === "assignment" || view === "workspace") && activeAssignment && (
+          {view === "workspace" && (
+            <WorkspaceScreen me={me} onBack={() => setView("home")} />
+          )}
+          {view === "assignment" && activeAssignment && (
             <AssignmentView
               assignment={activeAssignment}
               isWorkspace={isWorkspaceView}
