@@ -1,43 +1,44 @@
+/**
+ * Strawie logo: the name with "ie" selected and a live caret after it, the
+ * way text looks when someone is editing it with you.
+ *
+ * Letters are Plus Jakarta Sans ExtraBold (SIL Open Font License) converted
+ * to outlines, so the logo looks the same whatever fonts the visitor has.
+ */
+
+const WORD = "M269 12Q179 12 112 -30Q46 -73 22 -145L132 -197Q153 -153 189 -128Q225 -103 269 -103Q301 -103 318 -116Q335 -129 335 -152Q335 -164 329 -172Q323 -181 311 -188Q299 -195 281 -200L188 -226Q121 -245 85 -288Q49 -330 49 -388Q49 -439 75 -477Q101 -515 148 -536Q195 -558 256 -558Q336 -558 396 -520Q457 -483 482 -415L371 -363Q359 -397 328 -418Q296 -438 256 -438Q227 -438 210 -426Q194 -414 194 -393Q194 -382 200 -373Q206 -364 220 -357Q233 -350 253 -344L340 -318Q408 -298 444 -258Q480 -217 480 -158Q480 -107 454 -69Q427 -31 380 -10Q333 12 269 12ZM793 6Q694 6 640 -48Q585 -101 585 -197V-416H493V-546H498Q540 -546 562 -567Q585 -588 585 -630V-670H735V-546H863V-416H735V-207Q735 -179 745 -160Q755 -142 776 -133Q797 -124 828 -124Q835 -124 844 -125Q853 -126 863 -127V0Q848 2 829 4Q810 6 793 6ZM911 0V-546H1051V-415L1041 -434Q1059 -503 1100 -528Q1142 -552 1199 -552H1231V-422H1184Q1129 -422 1095 -388Q1061 -355 1061 -294V0ZM1426 12Q1367 12 1324 -7Q1281 -26 1258 -62Q1235 -97 1235 -146Q1235 -192 1256 -228Q1277 -263 1320 -287Q1364 -311 1429 -321L1596 -348V-238L1456 -213Q1424 -207 1407 -192Q1390 -178 1390 -151Q1390 -126 1409 -112Q1428 -98 1456 -98Q1493 -98 1521 -114Q1549 -130 1564 -158Q1580 -185 1580 -218V-360Q1580 -391 1556 -412Q1531 -433 1489 -433Q1449 -433 1418 -411Q1388 -389 1374 -353L1254 -410Q1270 -456 1305 -489Q1340 -522 1389 -540Q1438 -558 1496 -558Q1565 -558 1618 -533Q1671 -508 1700 -464Q1730 -419 1730 -360V0H1590V-88L1624 -94Q1600 -58 1571 -34Q1542 -11 1506 0Q1470 12 1426 12ZM1944 0 1756 -546H1911L2043 -152L1989 -153L2136 -546H2266L2412 -153L2358 -152L2490 -546H2646L2457 0H2327L2175 -422H2227L2074 0ZM2672 0V-546H2822V0ZM2672 -595V-745H2822V-595ZM3155 12Q3068 12 3004 -26Q2940 -65 2905 -130Q2870 -195 2870 -274Q2870 -356 2906 -420Q2943 -484 3005 -521Q3067 -558 3145 -558Q3210 -558 3260 -538Q3310 -517 3344 -480Q3379 -443 3397 -394Q3415 -346 3415 -289Q3415 -273 3414 -258Q3412 -242 3408 -231H2999V-341H3323L3252 -289Q3262 -332 3251 -366Q3240 -399 3212 -418Q3185 -438 3145 -438Q3106 -438 3078 -419Q3050 -400 3036 -363Q3022 -326 3025 -273Q3021 -227 3036 -192Q3051 -157 3082 -138Q3113 -118 3157 -118Q3197 -118 3226 -134Q3254 -150 3270 -178L3390 -121Q3374 -81 3340 -51Q3305 -21 3258 -4Q3211 12 3155 12Z";
+const S_GLYPH = "M269 12Q179 12 112 -30Q46 -73 22 -145L132 -197Q153 -153 189 -128Q225 -103 269 -103Q301 -103 318 -116Q335 -129 335 -152Q335 -164 329 -172Q323 -181 311 -188Q299 -195 281 -200L188 -226Q121 -245 85 -288Q49 -330 49 -388Q49 -439 75 -477Q101 -515 148 -536Q195 -558 256 -558Q336 -558 396 -520Q457 -483 482 -415L371 -363Q359 -397 328 -418Q296 -438 256 -438Q227 -438 210 -426Q194 -414 194 -393Q194 -382 200 -373Q206 -364 220 -357Q233 -350 253 -344L340 -318Q408 -298 444 -258Q480 -217 480 -158Q480 -107 454 -69Q427 -31 380 -10Q333 12 269 12Z";
+const WORD_VIEWBOX = "0 -850 3603 1060";
+const WORD_RATIO = 3603 / 1060;
+
+/** The wordmark. `size` is kept from the old icon+text logo; the mark is ~0.8× that tall. */
 export function StrawieLogoSvg({ size = 32 }: { size?: number }) {
+  const h = Math.round(size * 0.8);
   return (
-    <div className="flex items-center gap-2.5">
-      <div
-        className="flex items-center justify-center rounded-[10px] shrink-0"
-        style={{
-          width: size,
-          height: size,
-          background: "linear-gradient(145deg, #EF5A68 0%, #BF1F36 100%)",
-        }}
-      >
-        <svg
-          width={size * 0.55}
-          height={size * 0.55}
-          viewBox="0 0 18 18"
-          fill="none"
-        >
-          <path
-            d="M9 1C9 1 10.5 5.5 14 7C10.5 8.5 9 13 9 13C9 13 7.5 8.5 4 7C7.5 5.5 9 1 9 1Z"
-            fill="white"
-          />
-          <path
-            d="M9 13C9 13 9.8 15.2 11.5 16C9.8 16.8 9 19 9 19C9 19 8.2 16.8 6.5 16C8.2 15.2 9 13 9 13Z"
-            fill="white"
-            opacity="0.6"
-          />
-        </svg>
-      </div>
-      <span
-        style={{
-          fontSize: size * 0.56,
-          fontWeight: 800,
-          color: "var(--text)",
-          letterSpacing: "-0.02em",
-          lineHeight: 1,
-        }}
-      >
-        Strawie
-      </span>
-    </div>
+    <svg
+      role="img"
+      aria-label="Strawie"
+      height={h}
+      width={Math.round(h * WORD_RATIO)}
+      viewBox={WORD_VIEWBOX}
+      className="shrink-0 block"
+    >
+      <rect x="2607" y="-830" width="871" height="1020" rx="90" style={{ fill: "var(--logo-selection, rgba(229, 72, 77, 0.2))" }} />
+      <path d={WORD} style={{ fill: "var(--text, #0B0B0F)" }} />
+      <rect x="3503" y="-830" width="90" height="1020" rx="45" fill="#E5484D" />
+    </svg>
+  );
+}
+
+/** Square app icon: a selected "s" and the caret on a soft red tile. */
+export function StrawieMark({ size = 32 }: { size?: number }) {
+  return (
+    <svg role="img" aria-label="Strawie" width={size} height={size} viewBox="0 0 1000 1000" className="shrink-0 block">
+      <rect width="1000" height="1000" rx="280" fill="#FDE8E9" />
+      <rect x="223" y="220" width="460" height="560" rx="60" fill="#E5484D" fillOpacity="0.22" />
+      <path d={S_GLYPH} transform="translate(251 718) scale(0.8)" fill="#0B0B0F" />
+      <rect x="703" y="220" width="75" height="560" rx="37" fill="#E5484D" />
+    </svg>
   );
 }
 

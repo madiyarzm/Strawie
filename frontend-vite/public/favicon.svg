@@ -1,21 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Strawie">
-  <defs>
-    <linearGradient id="berry" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#EF5A68"/>
-      <stop offset="100%" stop-color="#BF1F36"/>
-    </linearGradient>
-  </defs>
-  <rect width="32" height="32" rx="9" fill="url(#berry)"/>
-  <!-- Mark matches StrawieLogoSvg in Logo.tsx -->
-  <g transform="translate(7 7)" fill="none">
-    <path
-      d="M9 1C9 1 10.5 5.5 14 7C10.5 8.5 9 13 9 13C9 13 7.5 8.5 4 7C7.5 5.5 9 1 9 1Z"
-      fill="white"
-    />
-    <path
-      d="M9 13C9 13 9.8 15.2 11.5 16C9.8 16.8 9 19 9 19C9 19 8.2 16.8 6.5 16C8.2 15.2 9 13 9 13Z"
-      fill="white"
-      opacity="0.6"
-    />
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-label="Strawie">
+  <!-- Matches StrawieMark in src/components/Logo.tsx -->
+  <rect width="1000" height="1000" rx="280" fill="#FDE8E9"/>
+  <rect x="223" y="220" width="460" height="560" rx="60" fill="#E5484D" fill-opacity="0.22"/>
+  <path d="M269 12Q179 12 112 -30Q46 -73 22 -145L132 -197Q153 -153 189 -128Q225 -103 269 -103Q301 -103 318 -116Q335 -129 335 -152Q335 -164 329 -172Q323 -181 311 -188Q299 -195 281 -200L188 -226Q121 -245 85 -288Q49 -330 49 -388Q49 -439 75 -477Q101 -515 148 -536Q195 -558 256 -558Q336 -558 396 -520Q457 -483 482 -415L371 -363Q359 -397 328 -418Q296 -438 256 -438Q227 -438 210 -426Q194 -414 194 -393Q194 -382 200 -373Q206 -364 220 -357Q233 -350 253 -344L340 -318Q408 -298 444 -258Q480 -217 480 -158Q480 -107 454 -69Q427 -31 380 -10Q333 12 269 12Z" transform="translate(251 718) scale(0.8)" fill="#0B0B0F"/>
+  <rect x="703" y="220" width="75" height="560" rx="37" fill="#E5484D"/>
 </svg>

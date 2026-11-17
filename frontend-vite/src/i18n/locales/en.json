@@ -20,115 +20,178 @@
   },
   "landing": {
     "nav": {
-      "editor": "Editor",
+      "lessons": "Lessons",
       "features": "Features",
-      "teachers": "Teachers",
-      "students": "Students",
+      "how": "How it works",
+      "faq": "FAQ",
       "demo": "Try demo",
       "signIn": "Sign in",
-      "open": "Open Strawie"
+      "open": "Start teaching"
     },
     "hero": {
-      "badge": "For computer-science classrooms",
       "title": "Teach Python the way <grad>you'd teach it</grad> in person.",
-      "subtitle": "Strawie is a browser-based Python editor where teachers and students work in the same file, live. No installs, no setup.",
-      "ctaPrimary": "Start a classroom",
-      "ctaSecondary": "Join with a code",
-      "ctaDemo": "Try the demo - no signup"
+      "subtitle": "Live lesson pages where you explain, code and run Python together with your students. Then switch everyone to their own copy and watch them work. Nothing to install.",
+      "ctaPrimary": "Start teaching",
+      "ctaDemo": "Try the demo",
+      "studentPrompt": "Student?",
+      "ctaJoin": "Join your class",
+      "mockTitle": "Group A · Functions · live",
+      "mockTaskTitle": "Split the bill",
+      "mockTests": "2/2 tests passed",
+      "mockTaskBody": "Write <code>split(total, people)</code> that returns what each person pays, rounded to 2 decimals.",
+      "mockTeacher": "Teacher",
+      "mockRunHint": "Press ▶ or Ctrl+Enter to run"
     },
     "showcase": {
-      "eyebrow": "Live collaboration",
-      "title": "Three cursors. One file. Zero conflicts.",
-      "subtitle": "Edits sync via Yjs CRDT — the algorithm that lets ten students type in the same file simultaneously without overwriting each other. Cursors carry names. Selections stay visible.",
       "live": "{{count}} live",
       "output": "Output"
     },
+    "lessons": {
+      "eyebrow": "Live lessons",
+      "title": "Teach together. Then let them try.",
+      "subtitle": "Explain on one shared page that everyone edits live. Press Solo and each student gets their own copy. You see all of them and can jump in to help.",
+      "together": "Together",
+      "solo": "Solo",
+      "togetherHint": "Everyone types on the same page, cursors and all.",
+      "soloHint": "Each student works on their own copy. You see every one.",
+      "soloHeader": "Solo · {{count}} students",
+      "soloFooter": "Click a student's copy to look over their shoulder and help.",
+      "statusRan": "Ran · no errors",
+      "statusTyping": "Typing…",
+      "statusHand": "Asked for help"
+    },
     "features": {
-      "eyebrow": "Features",
-      "title": "Everything a classroom needs.",
-      "subtitle": "Built-in, not bolted on. Strawie ships with everything a classroom needs — editor, runner, grader, and hints — no integrations required.",
-      "liveEditing": {
-        "tag": "Live editing",
-        "title": "See every keystroke.",
-        "body": "CodeMirror under the hood, Yjs for sync. Cursors carry names, selections highlight live, and the file stays consistent even when ten students edit at once."
+      "eyebrow": "Everything in one place",
+      "title": "Built for the way small classes actually run.",
+      "subtitle": "Lessons, homework and a whiteboard in one tab. No extra tools to set up.",
+      "pages": {
+        "tag": "Lesson pages",
+        "title": "Explain and code on the same page.",
+        "body": "Mix short notes with runnable Python, like a notebook. Students read, run and change the code right where you explained it.",
+        "mockHeading": "Asking for input",
+        "mockText": "input() waits for the user to type something and gives it back as text.",
+        "mockText2": "Try it: change the greeting, then run it again."
       },
-      "aiHints": {
-        "tag": "AI hints",
-        "title": "Stuck? Spend a few XP.",
-        "bubble": "Try printing <code>name</code> first to see what's inside."
+      "homework": {
+        "tag": "Homework",
+        "title": "Homework that checks itself.",
+        "hiddenTest": "Hidden test"
       },
-      "autoGrading": {
-        "tag": "Auto-grading",
-        "title": "Tests run on submit.",
-        "passed": "passed"
-      },
-      "invite": {
-        "tag": "Invite",
-        "title": "One link, six characters."
-      },
-      "sandbox": {
-        "tag": "Sandbox",
-        "title": "Code runs, isolated."
+      "private": {
+        "tag": "Private",
+        "title": "Private by default.",
+        "body": "Each student's homework is seen only by them and you."
       },
       "drawing": {
-        "tag": "Drawing",
-        "title": "Diagram together.",
-        "body": "Miro-style canvas, real-time. Sketch diagrams while you code."
+        "tag": "Whiteboard",
+        "title": "Draw it out.",
+        "body": "Shapes, arrows and text on a shared board for every lesson."
+      },
+      "schedule": {
+        "tag": "Schedule",
+        "title": "Your timetable, built in.",
+        "days": {
+          "mon": "M",
+          "tue": "T",
+          "wed": "W",
+          "thu": "T",
+          "fri": "F",
+          "sat": "S",
+          "sun": "S"
+        },
+        "next": "Next lesson: Thu 17:00"
+      },
+      "browser": {
+        "tag": "Runs in the browser",
+        "title": "Nothing to install.",
+        "where": "in your browser",
+        "body": "Real Python on any laptop or Chromebook. Code runs on the student's device, never on our servers."
       },
       "streaks": {
-        "tag": "Streaks & XP",
-        "title": "Effort visible from a glance."
+        "tag": "XP & streaks",
+        "title": "Progress students can see."
       },
-      "achievements": {
-        "tag": "Achievements",
-        "title": "Earn as you learn.",
-        "streak": "7-day streak",
-        "firstSolve": "First solve",
-        "topScorer": "Top scorer",
-        "hundredXp": "100 XP",
-        "hintMaster": "Hint master",
-        "perfectRun": "Perfect run"
+      "saved": {
+        "tag": "Autosave",
+        "title": "Never lose a line.",
+        "body": "Every keystroke is saved as you type, even when two people edit at once.",
+        "pill": "Saved · just now"
       }
     },
     "steps": {
       "eyebrow": "How it works",
-      "title": "Setup is one link.",
-      "step1Title": "Create a classroom",
-      "step1Desc": "Sign in with Google. Name your group. Done.",
-      "step2Title": "Share the code",
-      "step2Desc": "Send a 6-character invite to your students.",
-      "step3Title": "Code together",
-      "step3Desc": "Open the same file. Cursors and edits sync live.",
-      "step4Title": "Submit & review",
-      "step4Desc": "Tests run automatically. Leave feedback inline."
+      "title": "Your first lesson in five minutes.",
+      "subtitle": "No setup calls, no installs, no spreadsheets.",
+      "step1Title": "Create a group",
+      "step1Desc": "Give it a name and pick your class days and time.",
+      "step2Title": "Share the link",
+      "step2Desc": "Students open it and sign in with Google. That's it.",
+      "step3Title": "Teach live",
+      "step3Desc": "Explain together on one page, then press Solo so everyone tries it.",
+      "step4Title": "Homework checks itself",
+      "step4Desc": "Your tests run when students submit. You review and leave feedback."
     },
     "roles": {
-      "eyebrow": "Two views",
-      "title": "Different views of the same room.",
-      "forTeachers": "For Teachers",
-      "forStudents": "For Students",
-      "teacherHeading": "Lead the room.",
-      "studentHeading": "Learn out loud.",
-      "openAsTeacher": "Open Strawie as teacher",
-      "openAsStudent": "Open Strawie as student",
-      "teacherBullet1": "Create classrooms with invite codes",
-      "teacherBullet2": "Watch every student's editor live",
-      "teacherBullet3": "Set assignments with template & test code",
-      "teacherBullet4": "Auto-grade against your own tests",
-      "teacherBullet5": "Drop into any student's file to leave a cursor",
-      "studentBullet1": "Join a class with a code — no setup",
-      "studentBullet2": "Edit code with classmates in the same file",
-      "studentBullet3": "Submit once — see test results immediately",
-      "studentBullet4": "Earn XP, build a streak, customize a profile",
-      "studentBullet5": "Spend XP for an AI hint when stuck"
+      "eyebrow": "Who it's for",
+      "title": "One tool for both sides of the lesson.",
+      "teacherLabel": "For tutors and schools",
+      "teacherHeading": "Run the room.",
+      "teacherBullet1": "Groups with a schedule, so the next lesson is always one click away",
+      "teacherBullet2": "Shared lesson pages with notes and runnable code",
+      "teacherBullet3": "Solo mode: see every student's copy live",
+      "teacherBullet4": "Homework with your own tests, including hidden ones",
+      "teacherBullet5": "Review submissions and leave feedback in one place",
+      "teacherButton": "Start teaching",
+      "studentLabel": "For students",
+      "studentHeading": "Learn by doing.",
+      "studentBullet1": "Join your class with one link and a Google account",
+      "studentBullet2": "Run real Python in the browser, input() included",
+      "studentBullet3": "Ask for help when you're stuck",
+      "studentBullet4": "See which tests pass before you submit",
+      "studentBullet5": "Earn XP and keep your streak going",
+      "studentButton": "Join your class"
+    },
+    "trust": {
+      "eyebrow": "Safe by design",
+      "title": "Simple to trust.",
+      "subtitle": "Made for classrooms with kids in them.",
+      "noServerTitle": "Code never runs on our servers",
+      "noServerBody": "Python runs in a sandbox inside each student's browser.",
+      "privateTitle": "Homework stays private",
+      "privateBody": "Only the student and their teacher can open it.",
+      "noAdsTitle": "No ads, no tracking",
+      "noAdsBody": "We don't sell data or show ads to students.",
+      "googleTitle": "Google sign-in",
+      "googleBody": "No new passwords. Personal or school Google accounts."
+    },
+    "faq": {
+      "eyebrow": "FAQ",
+      "title": "Questions, answered.",
+      "installQ": "Do students need to install anything?",
+      "installA": "No. Strawie runs in any modern browser on a laptop or Chromebook. Python runs right in the page.",
+      "accountsQ": "How do students sign in?",
+      "accountsA": "With a Google account, personal or school. If your school limits third-party apps, your admin may need to allow Strawie first.",
+      "whoQ": "Who can see a student's code?",
+      "whoA": "Homework and Solo copies are visible only to that student and their teacher. The shared lesson page is visible to the whole group.",
+      "pythonQ": "What Python can students use?",
+      "pythonA": "Python 3 with the standard library, running in the browser. input() works. Code can't reach the internet or other people's files.",
+      "ownQ": "Can I write my own lessons and tests?",
+      "ownA": "Yes. Every lesson page and homework is yours to write. Tests can call a function or check what a program prints.",
+      "languagesQ": "Which languages does Strawie support?",
+      "languagesA": "English and Russian. Kazakh is coming soon."
     },
     "cta": {
-      "title": "Open the room.",
-      "subtitle": "Free while we're in beta. Sign in with a Google account — that's all it takes.",
-      "button": "Open Strawie"
+      "title": "Start your first lesson today.",
+      "subtitle": "Sign in with Google, create a group, share the link.",
+      "button": "Start teaching",
+      "demo": "Try the demo"
     },
     "footer": {
-      "copyright": "© Strawie · 2026"
+      "demo": "Try demo",
+      "terms": "Terms",
+      "privacy": "Privacy",
+      "contact": "Contact",
+      "copyright": "© {{year}} Strawie"
     }
   },
   "auth": {
