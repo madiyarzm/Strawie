@@ -22,6 +22,7 @@
   --subtle: #8A8A92;
   --muted: #52525B;
   --text: #0A0A0B;
+  --logo-selection: rgba(229, 72, 77, 0.2);
   --text-2: #27272A;
   --text-3: #71717A;
 
@@ -98,6 +99,7 @@
   --subtle: #7C7C85;
   --muted: #A1A1AA;
   --text: #F4F4F2;
+  --logo-selection: rgba(229, 72, 77, 0.38);
   --text-2: #D4D4D8;
   --text-3: #8E8E96;
 
