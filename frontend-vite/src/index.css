@@ -588,6 +588,21 @@ kbd.st-kbd {
   opacity: 0; pointer-events: none; transition: opacity 140ms var(--ease);
 }
 .nb-block:hover > .nb-controls, .nb-block:focus-within > .nb-controls { opacity: 1; pointer-events: auto; }
+.nb-format {
+  position: absolute; top: -12px; left: 0; z-index: 2;
+  display: flex; gap: 2px; padding: 2px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+  opacity: 0; pointer-events: none; transition: opacity 140ms var(--ease);
+}
+.nb-text:focus-within > .nb-format { opacity: 1; pointer-events: auto; }
+/* Blocks a student added to their own copy: a quiet marker so the teacher can
+   tell the student's notes from the task. */
+.nb-own.nb-text { padding-left: 12px; box-shadow: inset 3px 0 0 var(--indigo-20); border-radius: 4px; }
+.nb-own.nb-code .nb-code-card { border-style: dashed; }
+.ls-snap-text .cm-md-h1 { font-size: 1.35em; font-weight: 700; }
+.ls-snap-text .cm-md-h2 { font-size: 1.12em; font-weight: 700; }
+.ls-snap-text .cm-md-dot { display: inline-block; width: 1.1em; color: var(--text-3); }
+.nb-inline-code { font-family: var(--mono); font-size: 0.9em; background: var(--bg-3); border-radius: 4px; padding: 1px 3px; }
 .nb-add-row { display: flex; justify-content: center; gap: 4px; height: 22px; align-items: center; opacity: 0; transition: opacity 140ms var(--ease); }
 .nb-add-row:hover, .nb-add-row:focus-within { opacity: 1; }
 .nb-page:has(.nb-block) .nb-add-row:last-child, .nb-page > .nb-add-row:only-child { opacity: 0.8; }

@@ -1302,7 +1302,8 @@ export const MentorApp: React.FC = () => {
           )}
           {view === "lesson" && navLessonId && (
             <LessonScreen key={navLessonId} lessonId={navLessonId} me={me}
-              onBack={() => setView(navGroupId ? "group" : "home")} onReview={id => { setNavLessonId(id); setView("review"); }} />
+              onBack={() => setView(navGroupId ? "group" : "home")} onReview={id => { setNavLessonId(id); setView("review"); }}
+              onHomework={id => { setNavLessonId(id); setView("homework"); }} />
           )}
           {view === "homework" && navLessonId && (
             <HomeworkScreen key={navLessonId} lessonId={navLessonId} me={me} onBack={() => setView("home")} />

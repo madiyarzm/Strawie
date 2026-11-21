@@ -13,7 +13,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import * as Y from "yjs";
-import { ArrowDown, ArrowUp, Check, CircleDashed, Eye, EyeOff, Play, Plus, Square, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Bold, Check, CircleDashed, Code, Eye, EyeOff, Heading, Italic, List, Play, Plus, Square, Trash2, X } from "lucide-react";
+import type { EditorView } from "@codemirror/view";
 import { useCollab } from "../hooks/useCollab";
 import type { CollabStatus, PeerInfo } from "../hooks/useCollab";
 import { startRun } from "../lib/pyodideRunner";
@@ -22,6 +23,7 @@ import { BlockEditor } from "./BlockEditor";
 import { gradeProblem } from "./grading";
 import type { TestOutcome } from "./grading";
 import { readTests } from "./pageDoc";
+import { toggleLinePrefix, toggleWrap } from "./textFormat";
 
 export type PageKind = "board" | "solo" | "master" | "homework";
 
@@ -34,6 +36,9 @@ type Props = {
   userRole: "teacher" | "student";
   canEditText: boolean;
   canEditStructure: boolean;
+  /** Students: may add their own text/code blocks (and edit, move and delete
+   *  only those), without touching the teacher's blocks. */
+  canAddOwn?: boolean;
   /** Per-block grading results to show (student homework, review). */
   results?: Record<string, BlockResult>;
   handRaised?: boolean;
@@ -47,10 +52,11 @@ function newId(): string {
   return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
 }
 
-function makeBlock(type: "text" | "code", withTests: boolean): Y.Map<unknown> {
+function makeBlock(type: "text" | "code", withTests: boolean, own = false, id = newId()): Y.Map<unknown> {
   const m = new Y.Map<unknown>();
-  m.set("id", newId());
+  m.set("id", id);
   m.set("type", type);
+  if (own) m.set("own", true);
   m.set("text", new Y.Text());
   if (type === "code" && withTests) {
     m.set("starter", new Y.Text());
@@ -60,12 +66,15 @@ function makeBlock(type: "text" | "code", withTests: boolean): Y.Map<unknown> {
 }
 
 export const NotebookPage: React.FC<Props> = ({
-  roomId, kind, userName, userRole, canEditText, canEditStructure, results, handRaised, onDoc, onPeers, onStatus,
+  roomId, kind, userName, userRole, canEditText, canEditStructure, canAddOwn = false, results, handRaised, onDoc, onPeers, onStatus,
 }) => {
   const { t } = useTranslation();
   const [doc] = useState(() => new Y.Doc());
   const { awareness, peers, status, setHandRaised } = useCollab(roomId, doc, undefined, userName, userRole);
   const [blocks, setBlocks] = useState<Y.Map<unknown>[]>([]);
+  // The block this user just added gets the keyboard focus, so typing goes
+  // into it (and not into the "+ Text" button, where Space adds more blocks).
+  const [focusId, setFocusId] = useState<string | null>(null);
 
   useEffect(() => { onDoc?.(doc); }, [doc, onDoc]);
   useEffect(() => { onPeers?.(peers); }, [peers, onPeers]);
@@ -84,8 +93,12 @@ export const NotebookPage: React.FC<Props> = ({
 
   const insertAt = useCallback((index: number, type: "text" | "code", withTests = false) => {
     const arr = doc.getArray<Y.Map<unknown>>("blocks");
-    doc.transact(() => arr.insert(index, [makeBlock(type, withTests || (kind === "master" && type === "code"))]));
-  }, [doc, kind]);
+    const own = !canEditStructure && canAddOwn;
+    // The id is chosen here: a Y.Map can't be read until it's in the document.
+    const id = newId();
+    setFocusId(id);
+    doc.transact(() => arr.insert(index, [makeBlock(type, withTests || (kind === "master" && type === "code"), own, id)]));
+  }, [doc, kind, canEditStructure, canAddOwn]);
 
   const move = (index: number, delta: number) => {
     const arr = doc.getArray<Y.Map<unknown>>("blocks");
@@ -138,7 +151,8 @@ export const NotebookPage: React.FC<Props> = ({
     );
   }
 
-  const addRow = (index: number) => canEditStructure && (
+  const canAdd = canEditStructure || canAddOwn;
+  const addRow = (index: number) => canAdd && (
     <div className="nb-add-row">
       <button type="button" className="st-btn st-btn-ghost st-btn-sm" onClick={() => insertAt(index, "text")}><Plus className="h-3.5 w-3.5" />{t("lessons.page.addText", { defaultValue: "Text" })}</button>
       <button type="button" className="st-btn st-btn-ghost st-btn-sm" onClick={() => insertAt(index, "code")}><Plus className="h-3.5 w-3.5" />{t("lessons.page.addCode", { defaultValue: "Code" })}</button>
@@ -150,13 +164,17 @@ export const NotebookPage: React.FC<Props> = ({
       {status === "reconnecting" && (
         <div className="nb-banner">{t("lessons.page.offline", { defaultValue: "Connection lost. Your edits are kept and will sync when it's back." })}</div>
       )}
-      {blocks.length === 0 && !canEditStructure && (
+      {blocks.length === 0 && !canAdd && (
         <p className="text-[13px] py-8 text-center" style={{ color: "var(--text-3)" }}>{t("lessons.page.empty", { defaultValue: "This page is empty." })}</p>
       )}
       {blocks.map((block, index) => {
         const id = String(block.get("id"));
         const type = block.get("type") === "code" ? "code" : "text";
-        const controls = canEditStructure && (
+        const own = !!block.get("own");
+        // Students manage only blocks they added themselves.
+        const manage = canEditStructure || (canAddOwn && own);
+        const textEditable = canEditText || (canAddOwn && own);
+        const controls = manage && (
           <div className="nb-controls">
             <button type="button" className="st-icon-btn" style={{ width: 26, height: 26 }} title={t("lessons.page.moveUp", { defaultValue: "Move up" })} onClick={() => move(index, -1)} disabled={index === 0}><ArrowUp className="h-3.5 w-3.5" /></button>
             <button type="button" className="st-icon-btn" style={{ width: 26, height: 26 }} title={t("lessons.page.moveDown", { defaultValue: "Move down" })} onClick={() => move(index, 1)} disabled={index === blocks.length - 1}><ArrowDown className="h-3.5 w-3.5" /></button>
@@ -167,16 +185,17 @@ export const NotebookPage: React.FC<Props> = ({
           <React.Fragment key={id}>
             {index === 0 && addRow(0)}
             {type === "text" ? (
-              <div className="nb-block nb-text">
-                {controls}
-                <BlockEditor
-                  ytext={block.get("text") as Y.Text}
-                  awareness={awareness}
-                  language="text"
-                  editable={canEditText}
-                  placeholder={canEditText ? t("lessons.page.textPlaceholder", { defaultValue: "Write the task or an explanation…" }) : undefined}
-                />
-              </div>
+              <TextBlock
+                ytext={block.get("text") as Y.Text}
+                awareness={awareness}
+                editable={textEditable}
+                own={own && kind !== "board"}
+                controls={controls}
+                autoFocus={focusId === id}
+                placeholder={own && !canEditStructure
+                  ? t("lessons.page.ownTextPlaceholder", { defaultValue: "Your notes…" })
+                  : t("lessons.page.textPlaceholder", { defaultValue: "Write the task or an explanation…" })}
+              />
             ) : (
               <CodeBlock
                 block={block}
@@ -187,6 +206,8 @@ export const NotebookPage: React.FC<Props> = ({
                 problemNumber={problemNumbers[id]}
                 result={results?.[id]}
                 controls={controls}
+                own={own && kind !== "board"}
+                autoFocus={focusId === id}
               />
             )}
             {addRow(index + 1)}
@@ -204,6 +225,46 @@ export const NotebookPage: React.FC<Props> = ({
           </button>
         </div>
       )}
+    </div>
+  );
+};
+
+/** A text block with a small formatting bar while it's being edited. */
+const TextBlock: React.FC<{
+  ytext: Y.Text;
+  awareness: import("y-protocols/awareness").Awareness | null;
+  editable: boolean;
+  own: boolean;
+  controls: React.ReactNode;
+  placeholder: string;
+  autoFocus?: boolean;
+}> = ({ ytext, awareness, editable, own, controls, placeholder, autoFocus }) => {
+  const { t } = useTranslation();
+  const viewRef = useRef<EditorView | null>(null);
+  const act = (fn: (v: EditorView) => void) => (e: React.MouseEvent) => {
+    // Keep the editor's focus and selection.
+    e.preventDefault();
+    if (viewRef.current) fn(viewRef.current);
+  };
+  const tools: [React.ReactNode, string, (v: EditorView) => void][] = [
+    [<Bold className="h-3.5 w-3.5" />, t("lessons.page.fmtBold", { defaultValue: "Bold (Ctrl+B)" }), v => toggleWrap(v, "**")],
+    [<Italic className="h-3.5 w-3.5" />, t("lessons.page.fmtItalic", { defaultValue: "Italic (Ctrl+I)" }), v => toggleWrap(v, "*")],
+    [<Code className="h-3.5 w-3.5" />, t("lessons.page.fmtCode", { defaultValue: "Code (Ctrl+E)" }), v => toggleWrap(v, "`")],
+    [<Heading className="h-3.5 w-3.5" />, t("lessons.page.fmtHeading", { defaultValue: "Heading" }), v => toggleLinePrefix(v, "# ")],
+    [<List className="h-3.5 w-3.5" />, t("lessons.page.fmtList", { defaultValue: "List" }), v => toggleLinePrefix(v, "- ")],
+  ];
+  return (
+    <div className={`nb-block nb-text ${own ? "nb-own" : ""}`}>
+      {editable && (
+        <div className="nb-format" role="toolbar" aria-label={t("lessons.page.formatting", { defaultValue: "Formatting" })}>
+          {tools.map(([icon, label, fn]) => (
+            <button key={label} type="button" className="st-icon-btn" style={{ width: 26, height: 26 }} title={label} aria-label={label} onMouseDown={act(fn)}>{icon}</button>
+          ))}
+        </div>
+      )}
+      {controls}
+      <BlockEditor ytext={ytext} awareness={awareness} language="text" editable={editable} viewRef={viewRef}
+        placeholder={editable ? placeholder : undefined} autoFocus={autoFocus} />
     </div>
   );
 };
@@ -238,7 +299,9 @@ const CodeBlock: React.FC<{
   problemNumber?: number;
   result?: BlockResult;
   controls: React.ReactNode;
-}> = ({ block, blocks, index, awareness, kind, problemNumber, result, controls }) => {
+  own?: boolean;
+  autoFocus?: boolean;
+}> = ({ block, blocks, index, awareness, kind, problemNumber, result, controls, own, autoFocus }) => {
   const { t } = useTranslation();
   const [out, setOut] = useState<OutLine[] | null>(null);
   const [running, setRunning] = useState(false);
@@ -297,7 +360,7 @@ const CodeBlock: React.FC<{
   const outcomes = result?.outcomes ?? null;
 
   return (
-    <div className="nb-block nb-code">
+    <div className={`nb-block nb-code ${own ? "nb-own" : ""}`}>
       {controls}
       {problemNumber !== undefined && (
         <div className="nb-problem">
@@ -327,6 +390,7 @@ const CodeBlock: React.FC<{
             language="python"
             editable
             onRun={run}
+            autoFocus={autoFocus}
             className="nb-editor"
             placeholder={isMaster ? t("lessons.page.solutionPlaceholder", { defaultValue: "Your solution (students never see it)" }) : undefined}
           />
