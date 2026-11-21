@@ -137,6 +137,12 @@ def create_app() -> FastAPI:
     # Serve frontend static files.
     # Assets (JS/CSS/images) are served directly; all other paths fall back to
     # index.html so that React Router (BrowserRouter) handles client-side navigation.
+    #
+    # Caching: files under /assets have a content hash in their name, so they
+    # can be cached forever. Everything else (index.html above all) must be
+    # rechecked on every visit: with no Cache-Control a browser may keep an
+    # old index.html for hours after a deploy, pointing at bundles that no
+    # longer exist or that expect the old API (a blank page).
     if FRONTEND_DIR.exists():
         app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIR / "assets")), name="assets")
 
@@ -144,8 +150,15 @@ def create_app() -> FastAPI:
         async def serve_spa(full_path: str) -> FileResponse:
             candidate = (FRONTEND_DIR / full_path).resolve()
             if candidate.is_relative_to(FRONTEND_DIR) and candidate.is_file():
-                return FileResponse(str(candidate))
-            return FileResponse(str(FRONTEND_DIR / "index.html"))
+                return FileResponse(str(candidate), headers={"Cache-Control": "no-cache"})
+            return FileResponse(str(FRONTEND_DIR / "index.html"), headers={"Cache-Control": "no-cache"})
+
+    @app.middleware("http")
+    async def cache_hashed_assets(request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/assets/") and response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
 
     return app
 
