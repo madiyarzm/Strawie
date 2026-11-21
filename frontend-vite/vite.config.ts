@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // In dev, the React app runs on :5173 and the FastAPI backend on :8000.
@@ -14,8 +15,28 @@ const isolationHeaders = {
   "Cross-Origin-Embedder-Policy": "require-corp",
 };
 
+// The Python worker runs other people's code, so it gets a policy that can
+// reach only the Pyodide CDN, never our API. Same value as WORKER_CSP in
+// app/core/security_middleware.py (which sets it in production).
+const workerCsp = [
+  "default-src 'none'",
+  "script-src blob: https://cdn.jsdelivr.net 'wasm-unsafe-eval'",
+  "connect-src https://cdn.jsdelivr.net",
+  "worker-src 'none'",
+].join("; ")
+
+function workerPolicy(): Plugin {
+  const apply = (server: { middlewares: { use: (fn: (req: { url?: string }, res: { setHeader: (k: string, v: string) => void }, next: () => void) => void) => void } }) => {
+    server.middlewares.use((req, res, next) => {
+      if (req.url?.split("?")[0] === "/py-worker.js") res.setHeader("Content-Security-Policy", workerCsp)
+      next()
+    })
+  }
+  return { name: "strawie-worker-csp", configureServer: apply, configurePreviewServer: apply }
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), workerPolicy()],
   preview: { headers: isolationHeaders },
   server: {
     headers: isolationHeaders,
