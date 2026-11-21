@@ -91,25 +91,56 @@ def test_create_room_returns_room_and_sets_guest_cookie(client: TestClient):
     _cleanup_room(room_id)
 
 
-def test_get_room_returns_seeded_files_and_banner(client: TestClient, fresh_room):
-    """The room must be pre-seeded, so a reviewer never sees an empty state."""
+def test_get_room_returns_the_collab_room_id(client: TestClient, fresh_room):
     response = client.get(f"/api/v1/demo/rooms/{fresh_room.id}")
     assert response.status_code == 200, response.text
+    assert response.json()["collab_room_id"] == demo_collab_room_id(fresh_room.id)
 
-    body = response.json()
-    file_names = [f["name"] for f in body["files"]]
-    assert file_names == ["hello.py", "interactive.py"]
 
-    # Both files must have real content, not placeholders.
-    for seeded_file in body["files"]:
-        assert len(seeded_file["content"].strip()) > 50
+def _seeded(room_id: str):
+    """The document a brand-new demo room starts with (None if refused)."""
+    from pycrdt import Array, Doc
 
-    # interactive.py must actually exercise stdin, which is the point of it.
-    interactive = next(f for f in body["files"] if f["name"] == "interactive.py")
-    assert "input(" in interactive["content"]
+    from app.core.collab_store import policy_for_room
 
-    assert len(body["banner_lines"]) == 3
-    assert body["collab_room_id"] == demo_collab_room_id(fresh_room.id)
+    policy = policy_for_room(None, room_id)  # demo rooms never touch the db
+    if policy is None:
+        return None
+    assert policy.persist is False, "anonymous visitors must never write to the database"
+    doc = Doc()
+    policy.seed(doc)
+    return [dict(b) for b in doc.get("blocks", type=Array)]
+
+
+@pytest.mark.parametrize("lang", ["en", "ru", "kk"])
+def test_demo_class_page_is_a_real_notebook_lesson(fresh_room, lang):
+    """A visitor must never see an empty page: text and runnable code, in
+    their language, including a block that uses input()."""
+    blocks = _seeded(f"{demo_collab_room_id(fresh_room.id)}:page-{lang}")
+    kinds = [b["type"] for b in blocks]
+    assert "text" in kinds and kinds.count("code") >= 2
+    code = "\n".join(str(b["text"]) for b in blocks if b["type"] == "code")
+    assert "input(" in code
+
+
+@pytest.mark.parametrize("lang", ["en", "ru", "kk"])
+def test_demo_homework_has_solution_starter_and_tests(fresh_room, lang):
+    blocks = _seeded(f"{demo_collab_room_id(fresh_room.id)}:hw-{lang}")
+    problem = next(b for b in blocks if b["type"] == "code")
+    assert "def biggest" in str(problem["text"])
+    assert "def biggest" in str(problem["starter"]) and "pass" in str(problem["starter"])
+    tests = [dict(t) for t in problem["tests"]]
+    assert len(tests) >= 2 and all(t["kind"] == "call" and t["expected"] for t in tests)
+    assert any(t["hidden"] for t in tests)
+
+
+def test_demo_whiteboard_starts_empty(fresh_room):
+    assert _seeded(f"{demo_collab_room_id(fresh_room.id)}:draw") == []
+
+
+@pytest.mark.parametrize("segment", ["hello", "page", "page-xx", "hw-", "draw-en", "board-en"])
+def test_unknown_demo_page_is_refused(fresh_room, segment):
+    assert _seeded(f"{demo_collab_room_id(fresh_room.id)}:{segment}") is None
 
 
 def test_each_visitor_gets_a_distinct_room(client: TestClient):
@@ -317,7 +348,7 @@ def test_demo_rooms_are_invisible_to_the_real_user_room_parser(fresh_room):
     """`_parse_room_id` must not recognise a demo room, in either shape."""
     base = demo_collab_room_id(fresh_room.id)
     assert _parse_room_id(base) is None
-    assert _parse_room_id(f"{base}:hello.py") is None
+    assert _parse_room_id(f"{base}:page-en") is None
 
 
 @pytest.mark.parametrize(

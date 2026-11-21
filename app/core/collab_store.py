@@ -10,8 +10,9 @@ Rules:
   * Editor rooms  "<classroom>:<assignment>:<file>"  saved; the assignment's
     main file starts with its starter code, other files start empty.
   * Drawing rooms "drawing:<classroom>:<assignment>" saved; start empty.
-  * Demo rooms    "demo:<uuid>:<file>"                memory only; start with the
-    demo's seeded file. Anonymous visitors never write to the database.
+  * Demo rooms    "demo:<uuid>:<page>"                memory only; start with the
+    demo lesson (app/services/demo_seed.py). Anonymous visitors never write
+    to the database.
   * Lesson rooms  "lesson:<lesson>:..."               saved; see lesson_rooms.py.
     Personal copies (solo, homework) are built from their source room the
     first time they are opened.
@@ -81,11 +82,12 @@ def policy_for_room(db: Session, room_id: str) -> Optional[RoomPolicy]:
 
     if parse_demo_room_id(room_id) is not None:
         parts = room_id.split(":")
-        file_id = parts[2] if len(parts) == 3 else ""
-        from app.services.demo_seed import seed_files
+        from app.services.demo_seed import seed_for
 
-        content = next((f["content"] for f in seed_files() if f["id"] == file_id), "")
-        return RoomPolicy(persist=False, seed=_text_seed(content))
+        seed = seed_for(parts[2]) if len(parts) == 3 else None
+        if seed is None:
+            return None
+        return RoomPolicy(persist=False, seed=seed)
 
     lesson_room = lesson_rooms.parse_lesson_room(room_id)
     if lesson_room is not None:

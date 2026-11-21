@@ -293,7 +293,7 @@ def test_room_policies(session_factory):
         drawing = policy_for_room(db, f"drawing:{CLASSROOM}:{ASSIGNMENT}")
         assert drawing and drawing.persist and drawing.seed is None
 
-        demo = policy_for_room(db, f"demo:{uuid.uuid4()}:hello")
+        demo = policy_for_room(db, f"demo:{uuid.uuid4()}:page-en")
         assert demo and not demo.persist and demo.seed is not None
     finally:
         db.close()
