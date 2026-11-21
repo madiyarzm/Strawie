@@ -178,7 +178,7 @@
       "ownQ": "Can I write my own lessons and tests?",
       "ownA": "Yes. Every lesson page and homework is yours to write. Tests can call a function or check what a program prints.",
       "languagesQ": "Which languages does Strawie support?",
-      "languagesA": "English and Russian. Kazakh is coming soon."
+      "languagesA": "English, Russian and Kazakh."
     },
     "cta": {
       "title": "Start your first lesson today.",
@@ -218,8 +218,17 @@
     }
   },
   "app": {
-    "loadError": {"title": "Strawie couldn't load", "body": "The server had a problem. Try again in a moment.", "retry": "Try again"},
-    "menu": { "language": "Language", "appearance": "Appearance", "light": "Light", "dark": "Dark" },
+    "loadError": {
+      "title": "Strawie couldn't load",
+      "body": "The server had a problem. Try again in a moment.",
+      "retry": "Try again"
+    },
+    "menu": {
+      "language": "Language",
+      "appearance": "Appearance",
+      "light": "Light",
+      "dark": "Dark"
+    },
     "nav": {
       "dashboard": "Dashboard",
       "classroom": "Classroom",
@@ -514,14 +523,38 @@
         "galaxy": "Galaxy"
       },
       "achievements": {
-        "first": { "name": "First Blood", "desc": "First successful submission" },
-        "streak7": { "name": "Week Warrior", "desc": "7-day coding streak" },
-        "perfect10": { "name": "Perfectionist", "desc": "10 perfect score submissions" },
-        "speed": { "name": "Speed Coder", "desc": "Submit in under 5 minutes" },
-        "500lines": { "name": "Prolific Writer", "desc": "500+ lines of code written" },
-        "collab": { "name": "Team Player", "desc": "Edit in a session with 5+ peers" },
-        "legend": { "name": "Legendary", "desc": "Reach Level 20" },
-        "nocopy": { "name": "Original", "desc": "0% plagiarism on all work" }
+        "first": {
+          "name": "First Blood",
+          "desc": "First successful submission"
+        },
+        "streak7": {
+          "name": "Week Warrior",
+          "desc": "7-day coding streak"
+        },
+        "perfect10": {
+          "name": "Perfectionist",
+          "desc": "10 perfect score submissions"
+        },
+        "speed": {
+          "name": "Speed Coder",
+          "desc": "Submit in under 5 minutes"
+        },
+        "500lines": {
+          "name": "Prolific Writer",
+          "desc": "500+ lines of code written"
+        },
+        "collab": {
+          "name": "Team Player",
+          "desc": "Edit in a session with 5+ peers"
+        },
+        "legend": {
+          "name": "Legendary",
+          "desc": "Reach Level 20"
+        },
+        "nocopy": {
+          "name": "Original",
+          "desc": "0% plagiarism on all work"
+        }
       }
     }
   },
@@ -563,7 +596,8 @@
     "openInNewTab": "Open in new tab",
     "fullscreen": "Fullscreen",
     "startDrawing": "Start drawing…",
-    "panHint": "Hold Space + drag to pan"
+    "panHint": "Hold Space + drag to pan",
+    "eraserSize": "Eraser size"
   },
   "editor": {
     "handRaised": "Hand raised",
@@ -577,7 +611,11 @@
     "ifInfo": "Conditional branch: if condition:"
   },
   "lessons": {
-    "workspace": {"title": "My workspace", "private": "Only you can see this", "hint": "Try ideas here. Everything is saved, and ▶ runs a block in your browser."},
+    "workspace": {
+      "title": "My workspace",
+      "private": "Only you can see this",
+      "hint": "Try ideas here. Everything is saved, and ▶ runs a block in your browser."
+    },
     "nav": {
       "home": "Home",
       "overview": "Overview",
@@ -633,7 +671,14 @@
       "addCallTest": "Function check",
       "addIoTest": "Input → output",
       "checking": "Checking…",
-      "checkSolution": "Check with my solution"
+      "checkSolution": "Check with my solution",
+      "ownTextPlaceholder": "Your notes…",
+      "formatting": "Formatting",
+      "fmtBold": "Bold (Ctrl+B)",
+      "fmtItalic": "Italic (Ctrl+I)",
+      "fmtCode": "Code (Ctrl+E)",
+      "fmtHeading": "Heading",
+      "fmtList": "List"
     },
     "untitled": "Untitled lesson",
     "lesson": {
@@ -662,7 +707,13 @@
       "roomMode": "Room mode",
       "together": "Together",
       "solo": "Solo",
-      "end": "End lesson"
+      "end": "End lesson",
+      "copiesHint": "Each student's own copy of this lesson. Students can keep working on it after class.",
+      "myCopyHint": "Your own copy of this lesson: change the code, add notes, try things. Your teacher can see it.",
+      "studentCopies": "Students' copies",
+      "myCopy": "My copy",
+      "endedTeacher": "This lesson has ended. Students can still open it and their own copies to look back.",
+      "endedStudent": "This lesson has ended. Everything stays here, so you can come back to it anytime."
     },
     "submittedOf": "{{n}}/{{total}} submitted",
     "group": {
@@ -725,7 +776,8 @@
       "nothingToReview": "No homework submitted yet.",
       "noHomework": "No homework right now.",
       "newFeedback": "Your teacher left feedback",
-      "thisWeek": "This week"
+      "thisWeek": "This week",
+      "recent": "Recent lessons"
     },
     "today": "Today",
     "prepare": "Prepare",
@@ -743,7 +795,49 @@
       "namePlaceholder": "e.g. Tuesday group",
       "days": "Class days",
       "time": "Time",
-      "create": "Create group"
+      "create": "Create group",
+      "timesPerDay": "Time on each day",
+      "sameTime": "Same time every day",
+      "differentTimes": "Different time on some days?"
+    },
+    "openPage": "Open lesson"
+  },
+  "demo": {
+    "couldNotStart": "Could not start the demo",
+    "tryAgain": "Try again",
+    "backHome": "Back to home",
+    "settingUp": "Setting up your lesson…",
+    "settingUpBody": "Creating a private demo room and loading Python. This takes a few seconds.",
+    "expiredTitle": "This demo room has expired",
+    "couldNotLoad": "Could not load the demo",
+    "startFresh": "Start a fresh demo",
+    "opening": "Opening your lesson…",
+    "openingBody": "Connecting to the live classroom.",
+    "teacherName": "Teacher",
+    "studentName": "Student {{animal}}",
+    "animals": {
+      "fox": "Fox",
+      "otter": "Otter",
+      "heron": "Heron",
+      "ibex": "Ibex",
+      "lynx": "Lynx",
+      "marten": "Marten"
+    },
+    "pill": "Demo · you're the teacher",
+    "pillStudent": "Demo · student view",
+    "openAsStudent": "Open as a student",
+    "createClass": "Create your class",
+    "step1": "Press ▶ on a code block. Real Python runs in your browser, nothing to install.",
+    "step2": "Open Homework: that's how you write a problem with tests. Press \"Check with my solution\".",
+    "step3": "Click \"Open as a student\" and type in either tab: you're both on the same live page.",
+    "student1": "This is a student's screen. The teacher's text is read-only; code blocks are yours to edit and run.",
+    "student2": "Type in a code block here and watch it appear in the teacher's tab, and the other way round.",
+    "errors": {
+      "expired": "This demo room has expired. Start a fresh one.",
+      "rate_limited": "Too many demo rooms from your network. Please try again in an hour.",
+      "disabled": "The demo is temporarily unavailable. Please check back soon.",
+      "network": "Could not reach the server. Check your connection and try again.",
+      "unknown": "Something went wrong starting the demo. Please try again."
     }
   }
 }

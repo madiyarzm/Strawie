@@ -5,9 +5,8 @@ import en from "./locales/en.json";
 import ru from "./locales/ru.json";
 import kk from "./locales/kk.json";
 
-// Kazakh (kk) ships as an empty resource on purpose — it's selectable in the
-// language switcher but every key falls back to English until kk.json is
-// filled in. i18next does this fallback automatically per-key via fallbackLng.
+// Every language has the full set of keys. A key missing from ru/kk falls
+// back to English automatically (fallbackLng).
 export const SUPPORTED_LANGUAGES = [
   { code: "en", label: "EN", name: "English" },
   { code: "ru", label: "RU", name: "Русский" },
