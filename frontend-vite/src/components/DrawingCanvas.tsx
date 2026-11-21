@@ -26,6 +26,15 @@ const WIDTHS = [
   { value: 12, labelKey: "drawing.sizeThick" },
 ];
 
+// Eraser diameters in screen pixels. Kept independent of the pen width (a
+// fine pen shouldn't mean a tiny eraser) and of zoom (the eraser covers the
+// same area of the screen at any zoom level).
+const ERASER_SIZES = [
+  { value: 24, labelKey: "drawing.sizeThin" },
+  { value: 56, labelKey: "drawing.sizeMedium" },
+  { value: 120, labelKey: "drawing.sizeThick" },
+];
+
 // Stroke colours are stored as these fixed hex values (shared over Yjs, so
 // they must stay stable across clients). They were picked for a dark board;
 // on the light board we draw them with deeper equivalents, and the default
@@ -173,6 +182,9 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const [tool, setTool] = useState<Tool>("pen");
   const [color, setColor] = useState(COLORS[0].value);
   const [strokeWidth, setStrokeWidth] = useState(WIDTHS[1].value);
+  const [eraserSize, setEraserSize] = useState(ERASER_SIZES[1].value);
+  // Outline that follows the pointer so you can see what the eraser covers.
+  const eraserRingRef = useRef<HTMLDivElement>(null);
 
   // View (zoom/pan) — ref for event handlers, state for UI
   const viewRef = useRef<View>({ scale: 1, ox: 0, oy: 0 });
@@ -356,15 +368,21 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         tool,
         color,
-        width: tool === "eraser" ? strokeWidth * 4 : strokeWidth,
+        width: tool === "eraser" ? eraserSize / viewRef.current.scale : strokeWidth,
         points: SHAPES.includes(tool) ? [pt, pt] : [pt],
       };
     },
-    [tool, color, strokeWidth],
+    [tool, color, strokeWidth, eraserSize],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
+      const ring = eraserRingRef.current;
+      if (ring) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        ring.style.transform = `translate(${e.clientX - rect.left}px, ${e.clientY - rect.top}px)`;
+        ring.style.opacity = "1";
+      }
       if (panStartRef.current) {
         const dx = e.clientX - panStartRef.current.x;
         const dy = e.clientY - panStartRef.current.y;
@@ -464,7 +482,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     : isPanMode
     ? "grab"
     : tool === "eraser"
-    ? "cell"
+    ? "none"
     : tool === "text"
     ? "text"
     : "crosshair";
@@ -501,9 +519,30 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerUp}
+          onPointerLeave={() => {
+            handlePointerUp();
+            if (eraserRingRef.current) eraserRingRef.current.style.opacity = "0";
+          }}
           onContextMenu={(e) => e.preventDefault()}
         />
+
+        {tool === "eraser" && !isPanMode && (
+          <div
+            ref={eraserRingRef}
+            aria-hidden
+            className="absolute left-0 top-0 pointer-events-none rounded-full"
+            style={{
+              width: eraserSize,
+              height: eraserSize,
+              marginLeft: -eraserSize / 2,
+              marginTop: -eraserSize / 2,
+              border: "1.5px solid var(--text-2)",
+              boxShadow: "0 0 0 1px var(--bg)",
+              background: "rgba(127,127,127,0.08)",
+              opacity: 0,
+            }}
+          />
+        )}
 
         {textDraft && (
           <textarea
@@ -649,21 +688,39 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           {divider}
 
           <div className="flex items-center gap-0.5">
-            {WIDTHS.map((w) => (
-              <button
-                key={w.value}
-                type="button"
-                onClick={() => setStrokeWidth(w.value)}
-                title={t(w.labelKey)}
-                className="h-8 w-9 grid place-items-center rounded-full transition-colors hover:bg-[var(--bg-3)]"
-                style={{ background: strokeWidth === w.value ? "var(--bg-3)" : "transparent" }}
-              >
-                <div
-                  className="rounded-full"
-                  style={{ width: Math.min(w.value * 2.5, 22), height: Math.max(2, w.value), background: strokeWidth === w.value ? "var(--text)" : "var(--text-3)" }}
-                />
-              </button>
-            ))}
+            {tool === "eraser"
+              ? ERASER_SIZES.map((w, i) => (
+                  <button
+                    key={w.value}
+                    type="button"
+                    onClick={() => setEraserSize(w.value)}
+                    title={t("drawing.eraserSize", { defaultValue: "Eraser size" }) + ": " + t(w.labelKey)}
+                    aria-pressed={eraserSize === w.value}
+                    className="h-8 w-9 grid place-items-center rounded-full transition-colors hover:bg-[var(--bg-3)]"
+                    style={{ background: eraserSize === w.value ? "var(--bg-3)" : "transparent" }}
+                  >
+                    <div
+                      className="rounded-full"
+                      style={{ width: 8 + i * 6, height: 8 + i * 6, border: `1.5px solid ${eraserSize === w.value ? "var(--text)" : "var(--text-3)"}` }}
+                    />
+                  </button>
+                ))
+              : WIDTHS.map((w) => (
+                  <button
+                    key={w.value}
+                    type="button"
+                    onClick={() => setStrokeWidth(w.value)}
+                    title={t(w.labelKey)}
+                    aria-pressed={strokeWidth === w.value}
+                    className="h-8 w-9 grid place-items-center rounded-full transition-colors hover:bg-[var(--bg-3)]"
+                    style={{ background: strokeWidth === w.value ? "var(--bg-3)" : "transparent" }}
+                  >
+                    <div
+                      className="rounded-full"
+                      style={{ width: Math.min(w.value * 2.5, 22), height: Math.max(2, w.value), background: strokeWidth === w.value ? "var(--text)" : "var(--text-3)" }}
+                    />
+                  </button>
+                ))}
           </div>
 
           {divider}

@@ -48,3 +48,24 @@ def test_cross_origin_isolation_headers(client):
     r = client.get("/health")
     assert r.headers["Cross-Origin-Opener-Policy"] == "same-origin"
     assert r.headers["Cross-Origin-Embedder-Policy"] == "require-corp"
+
+
+def test_python_worker_cannot_reach_our_api(client):
+    """Code run in the worker may be someone else's (a student's code run by
+    the teacher). Its CSP must not allow requests to our own origin, or that
+    code could call the API with the viewer's session cookie."""
+    from app.core.security_middleware import WORKER_CSP
+
+    csp = client.get("/py-worker.js").headers.get("content-security-policy", "")
+    assert csp == WORKER_CSP
+    directives = {d.split()[0]: d.split()[1:] for d in csp.split("; ")}
+    assert directives["default-src"] == ["'none'"]
+    assert directives["connect-src"] == ["https://cdn.jsdelivr.net"]
+    assert "'self'" not in directives["script-src"]
+    assert directives["worker-src"] == ["'none'"]
+
+
+def test_page_csp_is_not_the_worker_csp(client):
+    from app.core.security_middleware import WORKER_CSP
+
+    assert client.get("/health").headers.get("content-security-policy") != WORKER_CSP

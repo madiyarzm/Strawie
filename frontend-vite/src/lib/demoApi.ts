@@ -11,18 +11,11 @@
 const API_BASE: string =
   (import.meta.env.VITE_API_URL as string | undefined) ?? "";
 
-export type DemoFile = {
-  id: string;
-  name: string;
-  content: string;
-};
-
 export type DemoRoom = {
   room_id: string;
   expires_at: string;
+  /** Base Yjs room id; pages are "<collab_room_id>:page-en", ":hw-en", ":draw". */
   collab_room_id: string;
-  files: DemoFile[];
-  banner_lines: string[];
 };
 
 /**

@@ -18,6 +18,7 @@ import { bracketMatching, indentOnInput } from "@codemirror/language";
 import { autocompletion, closeBrackets, closeBracketsKeymap, completeFromList } from "@codemirror/autocomplete";
 import { python } from "@codemirror/lang-python";
 import { pythonSnippets, strawieTheme } from "../components/editorTheme";
+import { formattedText } from "./textFormat";
 
 type Props = {
   ytext: Y.Text;
@@ -28,6 +29,10 @@ type Props = {
   /** Called on Mod-Enter (run this block). */
   onRun?: () => void;
   className?: string;
+  /** Receives the editor view (for the formatting toolbar). */
+  viewRef?: React.MutableRefObject<EditorView | null>;
+  /** Put the cursor here when the editor appears (a block that was just added). */
+  autoFocus?: boolean;
 };
 
 const proseTheme = EditorView.theme({
@@ -46,7 +51,7 @@ const codeTweaks = EditorView.theme({
   ".cm-placeholder": { color: "var(--subtle)", fontStyle: "italic" },
 });
 
-export const BlockEditor: React.FC<Props> = ({ ytext, awareness, language, editable, placeholder, onRun, className }) => {
+export const BlockEditor: React.FC<Props> = ({ ytext, awareness, language, editable, placeholder, onRun, className, viewRef, autoFocus }) => {
   const { t } = useTranslation();
   const host = useRef<HTMLDivElement>(null);
   const onRunRef = useRef(onRun);
@@ -71,13 +76,20 @@ export const BlockEditor: React.FC<Props> = ({ ytext, awareness, language, edita
           // Earlier extensions win in CodeMirror, so tweaks go before the base theme.
           codeTweaks, python(), ...strawieTheme, EditorState.tabSize.of(4), ...common,
         ]
-      : [proseTheme, EditorView.lineWrapping, ...strawieTheme, ...common];
+      : [proseTheme, formattedText(!editable), EditorView.lineWrapping, ...strawieTheme, ...common];
     const view = new EditorView({
       state: EditorState.create({ doc: ytext.toString(), extensions }),
       parent: host.current,
     });
-    return () => view.destroy();
-  }, [ytext, awareness, language, editable, placeholder, t]);
+    if (viewRef) viewRef.current = view;
+    if (autoFocus && editable) view.focus();
+    return () => {
+      if (viewRef?.current === view) viewRef.current = null;
+      view.destroy();
+    };
+    // autoFocus only matters when the editor is first created.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ytext, awareness, language, editable, placeholder, t, viewRef]);
 
   return <div ref={host} className={className} />;
 };

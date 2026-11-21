@@ -64,6 +64,34 @@ _PROD_CSP = "; ".join(
 )
 
 
+# The Python worker (frontend-vite/public/py-worker.js) runs code that other
+# people wrote: a student's code on the shared board, in their own copy or in
+# their homework runs in the teacher's browser when the teacher presses Run.
+# The worker lives on our origin, so with the page policy above that code
+# could `import js; js.fetch("/api/...")` and the browser would attach the
+# viewer's session cookie (httpOnly stops reading the cookie, not using it).
+#
+# A dedicated worker takes its CSP from its own script response, so the
+# worker gets a policy that can reach nothing but the Pyodide CDN:
+#   connect-src   only jsdelivr (wasm, stdlib, packages). No 'self': our API
+#                 and our WebSocket are unreachable from user code.
+#   script-src    blob: for the integrity-checked loader, jsdelivr for
+#                 Pyodide's own files. No 'self', so importScripts can't be
+#                 used to send GET requests to our API either.
+#   worker-src    'none': no nested workers with a different policy.
+#   default-src   'none' for everything else.
+# Keep in sync with workerCsp in frontend-vite/vite.config.ts.
+WORKER_PATH = "/py-worker.js"
+WORKER_CSP = "; ".join(
+    [
+        "default-src 'none'",
+        "script-src blob: https://cdn.jsdelivr.net 'wasm-unsafe-eval'",
+        "connect-src https://cdn.jsdelivr.net",
+        "worker-src 'none'",
+    ]
+)
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Attach security headers to every HTTP response."""
 
@@ -87,6 +115,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
         headers.setdefault("Cross-Origin-Embedder-Policy", "require-corp")
         headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+        if request.url.path == WORKER_PATH:
+            # In every environment, so a policy that breaks Python shows up in
+            # development first.
+            headers["Content-Security-Policy"] = WORKER_CSP
+            headers["Cache-Control"] = "no-cache"
         if self._is_production:
             headers.setdefault("Content-Security-Policy", _PROD_CSP)
             headers.setdefault(

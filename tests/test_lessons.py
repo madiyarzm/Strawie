@@ -236,6 +236,32 @@ def test_schedule_slots_follow_the_groups_time_zone(world):
     ]
 
 
+def test_schedule_can_have_a_different_time_on_some_days(world):
+    group = world["group"]
+    # Tuesdays at 17:00 (the usual time), Thursdays at 18:30. JSON keys are strings.
+    group.schedule = {"days": [1, 3], "time": "17:00", "times": {"3": "18:30"}, "tz": "Asia/Almaty"}
+    start = datetime(2026, 11, 16, 0, 0, tzinfo=timezone.utc)
+    end = datetime(2026, 11, 23, 0, 0, tzinfo=timezone.utc)
+    assert schedule_slots(group, start, end) == [
+        datetime(2026, 11, 17, 12, 0, tzinfo=timezone.utc),
+        datetime(2026, 11, 19, 13, 30, tzinfo=timezone.utc),
+    ]
+
+
+def test_schedule_times_are_validated_and_trimmed():
+    from pydantic import ValidationError
+
+    from app.schemas.lesson import GroupSchedule
+
+    s = GroupSchedule(days=[1, 3], time="17:00", times={1: "17:00", 3: "18:30", 5: "09:00"}, tz="UTC")
+    # Same-as-default and days not in the schedule are dropped.
+    assert s.times == {3: "18:30"}
+    with pytest.raises(ValidationError):
+        GroupSchedule(days=[1], time="17:00", times={1: "25:00"})
+    # Old schedules without per-day times still load.
+    assert GroupSchedule(days=[2], time="10:00").times == {}
+
+
 # ── HTTP ──────────────────────────────────────────────────────────────────
 
 
@@ -323,3 +349,26 @@ def test_agenda_shows_unprepared_scheduled_slots(world, as_user, monkeypatch):
     assert [l["id"] for l in data["lessons"]] == [str(world["lesson"].id)]
     assert "2026-11-19T12:00:00Z" in [s["starts_at"].replace("+00:00", "Z") for s in data["open_slots"]]
     assert all(not s["is_teacher"] for s in data["open_slots"])
+
+
+def test_ended_lesson_is_marked_and_stays_open_to_students(world, as_user):
+    lid = str(world["lesson"].id)
+    teacher = as_user("teacher")
+    assert teacher.patch(f"/api/v1/lessons/{lid}", json={"live": True}).json()["ended"] is False
+    ended = teacher.patch(f"/api/v1/lessons/{lid}", json={"live": False}).json()
+    assert ended["live"] is False and ended["ended"] is True
+
+    # Students can still open the lesson and its rooms after it ends.
+    student = as_user("ann")
+    assert student.get(f"/api/v1/lessons/{lid}").json()["ended"] is True
+    assert _can(world, "ann", f"lesson:{lid}:board")
+    assert _can(world, "ann", f"lesson:{lid}:solo:{world['ann'].id}")
+
+    # Starting it again clears the ended mark.
+    teacher = as_user("teacher")
+    assert teacher.patch(f"/api/v1/lessons/{lid}", json={"live": True}).json()["ended"] is False
+
+
+def test_never_started_lesson_is_not_ended(world, as_user):
+    lid = str(world["lesson"].id)
+    assert as_user("teacher").patch(f"/api/v1/lessons/{lid}", json={"live": False}).json()["ended"] is False

@@ -22,7 +22,6 @@ from app.core.limiter import client_ip, limiter
 from app.core.ws_acl import demo_collab_room_id
 from app.dependencies import DBSession, SettingsDep
 from app.schemas.demo import DemoRoomCreated, DemoRoomOut
-from app.services.demo_seed import BANNER_LINES, seed_files
 from app.services.demo_service import (
     count_recent_rooms_for_ip,
     create_room,
@@ -127,10 +126,10 @@ def get_demo_room(
     db: DBSession,
     settings: SettingsDep,
 ) -> DemoRoomOut:
-    """Return the seed contents of a demo room, or 404 if it is gone.
+    """Return a demo room's ids, or 404 if it is gone.
 
     Unauthenticated on purpose: this is how the "Open in second tab" link
-    works, and the response contains nothing but static seed content.
+    works, and the response contains nothing but the room's ids.
     """
     _require_demo_enabled(settings)
 
@@ -155,6 +154,4 @@ def get_demo_room(
         room_id=str(room.id),
         expires_at=room.expires_at,
         collab_room_id=demo_collab_room_id(room.id),
-        files=seed_files(),  # type: ignore[arg-type]
-        banner_lines=BANNER_LINES,
     )

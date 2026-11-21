@@ -5,11 +5,12 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import * as Y from "yjs";
-import { ArrowLeft, Check, Clock, LifeBuoy, Lock, PenLine, FileText, Users } from "lucide-react";
+import { ArrowLeft, Check, Clock, GraduationCap, LifeBuoy, Lock, PenLine, FileText, User, Users } from "lucide-react";
 import { DrawingCanvas } from "../components/DrawingCanvas";
 import { lessonTitle, lessonsApi } from "./api";
 import type { Lesson, ProblemResult, RosterRow, Submission } from "./api";
 import { NotebookPage } from "./NotebookPage";
+import { FormattedText } from "./FormattedText";
 import { snapshotBlocks } from "./pageDoc";
 import type { BlockResult } from "./NotebookPage";
 import { gradeProblem, toProblemResult } from "./grading";
@@ -41,7 +42,7 @@ const Seg: React.FC<{ value: string; options: { id: string; label: string; icon?
 
 // ── Lesson ────────────────────────────────────────────────────────────────
 
-export const LessonScreen: React.FC<{ lessonId: string; me: Me; onBack: () => void; onReview: (lessonId: string) => void }> = ({ lessonId, me, onBack, onReview }) => {
+export const LessonScreen: React.FC<{ lessonId: string; me: Me; onBack: () => void; onReview: (lessonId: string) => void; onHomework?: (lessonId: string) => void }> = ({ lessonId, me, onBack, onReview, onHomework }) => {
   const { t } = useTranslation();
   const { lesson, setLesson, error } = usePolledLesson(lessonId, 3000);
   const [surface, setSurface] = useState<"page" | "board">("page");
@@ -52,6 +53,9 @@ export const LessonScreen: React.FC<{ lessonId: string; me: Me; onBack: () => vo
   const [handRaised, setHandRaised] = useState(false);
   const [customizing, setCustomizing] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
+  // Outside live class time: students pick the class page or their own copy;
+  // the teacher can look through the students' copies.
+  const [own, setOwn] = useState(false);
   const teacher = !!lesson?.is_teacher;
 
   // Roster (names) and who's connected, for the teacher's solo grid.
@@ -77,10 +81,11 @@ export const LessonScreen: React.FC<{ lessonId: string; me: Me; onBack: () => vo
   if (!lesson) return <div className="ls-screen"><p className="ls-muted">{t("common.loading")}</p></div>;
 
   const solo = lesson.live && lesson.room_mode === "solo";
+  const browsingCopies = !lesson.live && own;
   const title = lessonTitle(lesson, t("lessons.untitled", { defaultValue: "Untitled lesson" }));
-  const page = (roomId: string, opts: { kind: "board" | "solo" | "master" | "homework"; text: boolean; structure: boolean }) => (
+  const page = (roomId: string, opts: { kind: "board" | "solo" | "master" | "homework"; text: boolean; structure: boolean; own?: boolean }) => (
     <NotebookPage key={roomId} roomId={roomId} kind={opts.kind} userName={me.displayName} userRole={me.role}
-      canEditText={opts.text} canEditStructure={opts.structure} handRaised={handRaised} />
+      canEditText={opts.text} canEditStructure={opts.structure} canAddOwn={opts.own} handRaised={handRaised} />
   );
 
   let body: React.ReactNode;
@@ -130,7 +135,7 @@ export const LessonScreen: React.FC<{ lessonId: string; me: Me; onBack: () => vo
         </div>
       </>
     );
-  } else if (teacher && solo) {
+  } else if (teacher && (solo || browsingCopies)) {
     if (focus) {
       const student = students.find(s => s.user_id === focus);
       body = (
@@ -148,9 +153,13 @@ export const LessonScreen: React.FC<{ lessonId: string; me: Me; onBack: () => vo
       body = (
         <>
           <div className="ls-banner">
-            <span>{t("lessons.lesson.soloHint", { defaultValue: "Everyone works on their own copy of the page. Only you can see all of them." })}</span>
-            <span className="ls-spacer" />
-            <button type="button" className="st-btn st-btn-primary st-btn-sm" onClick={() => void update({ room_mode: "together" })}>{t("lessons.lesson.bringBack", { defaultValue: "Bring everyone back" })}</button>
+            {solo ? (
+              <>
+                <span>{t("lessons.lesson.soloHint", { defaultValue: "Everyone works on their own copy of the page. Only you can see all of them." })}</span>
+                <span className="ls-spacer" />
+                <button type="button" className="st-btn st-btn-primary st-btn-sm" onClick={() => void update({ room_mode: "together" })}>{t("lessons.lesson.bringBack", { defaultValue: "Bring everyone back" })}</button>
+              </>
+            ) : <span>{t("lessons.lesson.copiesHint", { defaultValue: "Each student's own copy of this lesson. Students can keep working on it after class." })}</span>}
           </div>
           <div className="ls-solo-grid">
             {students.length === 0 && <p className="ls-muted">{t("lessons.group.noStudents", { defaultValue: "No students yet. Share the invite link." })}</p>}
@@ -169,7 +178,14 @@ export const LessonScreen: React.FC<{ lessonId: string; me: Me; onBack: () => vo
     body = (
       <>
         <div className="ls-banner">{t("lessons.lesson.soloStudent", { defaultValue: "Solo time: this is your own copy. Your teacher can see it." })}</div>
-        <div className="ls-canvas">{page(`lesson:${lesson.id}:solo:${me.id}`, { kind: "solo", text: true, structure: false })}</div>
+        <div className="ls-canvas">{page(`lesson:${lesson.id}:solo:${me.id}`, { kind: "solo", text: true, structure: false, own: true })}</div>
+      </>
+    );
+  } else if (!teacher && browsingCopies) {
+    body = (
+      <>
+        <div className="ls-banner">{t("lessons.lesson.myCopyHint", { defaultValue: "Your own copy of this lesson: change the code, add notes, try things. Your teacher can see it." })}</div>
+        <div className="ls-canvas">{page(`lesson:${lesson.id}:solo:${me.id}`, { kind: "solo", text: true, structure: false, own: true })}</div>
       </>
     );
   } else {
@@ -201,6 +217,18 @@ export const LessonScreen: React.FC<{ lessonId: string; me: Me; onBack: () => vo
         )}
         <Seg label={t("lessons.lesson.surface", { defaultValue: "Surface" })} value={surface} onChange={v => setSurface(v as "page" | "board")}
           options={[{ id: "page", label: t("lessons.lesson.page", { defaultValue: "Page" }), icon: <FileText className="h-3.5 w-3.5" /> }, { id: "board", label: t("lessons.lesson.whiteboard", { defaultValue: "Whiteboard" }), icon: <PenLine className="h-3.5 w-3.5" /> }]} />
+        {!lesson.live && (teacher ? tab === "class" : true) && surface === "page" && (
+          <Seg label={t("lessons.lesson.pages", { defaultValue: "Pages" })} value={own ? "own" : "class"} onChange={v => { setOwn(v === "own"); setFocus(null); }}
+            options={[
+              { id: "class", label: t("lessons.lesson.classPage", { defaultValue: "Class page" }) },
+              { id: "own", label: teacher ? t("lessons.lesson.studentCopies", { defaultValue: "Students' copies" }) : t("lessons.lesson.myCopy", { defaultValue: "My copy" }), icon: <User className="h-3.5 w-3.5" /> },
+            ]} />
+        )}
+        {!teacher && lesson.homework_enabled && onHomework && (
+          <button type="button" className="st-btn st-btn-secondary st-btn-sm" onClick={() => onHomework(lesson.id)}>
+            <GraduationCap className="h-3.5 w-3.5" />{t("lessons.homework", { defaultValue: "Homework" })}
+          </button>
+        )}
         {teacher && lesson.live && tab === "class" && (
           <Seg label={t("lessons.lesson.roomMode", { defaultValue: "Room mode" })} value={lesson.room_mode} onChange={v => { setFocus(null); void update({ room_mode: v as "together" | "solo" }); }}
             options={[{ id: "together", label: t("lessons.lesson.together", { defaultValue: "Together" }), icon: <Users className="h-3.5 w-3.5" /> }, { id: "solo", label: t("lessons.lesson.solo", { defaultValue: "Solo" }) }]} />
@@ -215,6 +243,14 @@ export const LessonScreen: React.FC<{ lessonId: string; me: Me; onBack: () => vo
           </button>
         )}
       </header>
+      {lesson.ended && !lesson.live && !own && surface === "page" && (teacher ? tab === "class" : true) && (
+        <div className="ls-banner">
+          <Check className="h-4 w-4" />
+          <span>{teacher
+            ? t("lessons.lesson.endedTeacher", { defaultValue: "This lesson has ended. Students can still open it and their own copies to look back." })
+            : t("lessons.lesson.endedStudent", { defaultValue: "This lesson has ended. Everything stays here, so you can come back to it anytime." })}</span>
+        </div>
+      )}
       {body}
     </div>
   );
@@ -310,7 +346,7 @@ export const HomeworkScreen: React.FC<{ lessonId: string; me: Me; onBack: () => 
       <div className="ls-canvas">
         <p className="ls-note">{t("lessons.hw.runHint", { defaultValue: "▶ runs a block together with the blocks above it, so your variables carry down the page." })}</p>
         <NotebookPage roomId={`lesson:${lesson.id}:hw:${me.id}`} kind="homework" userName={me.displayName} userRole={me.role}
-          canEditText={false} canEditStructure={false} results={results ?? undefined} onDoc={onDoc} />
+          canEditText={false} canEditStructure={false} canAddOwn results={results ?? undefined} onDoc={onDoc} />
       </div>
     </div>
   );
@@ -412,7 +448,7 @@ export const ReviewScreen: React.FC<{ lessonId?: string; me: Me; onBack: () => v
           {row && !live && sub && (
             <div className="nb-page" style={{ maxWidth: "none", width: "100%" }}>
               {sub.blocks.map(b => b.type === "text"
-                ? <p key={b.id} className="ls-snap-text">{b.text}</p>
+                ? <FormattedText key={b.id} className="ls-snap-text" text={b.text} />
                 : (
                   <div key={b.id} className="nb-code-card">
                     {results?.[b.id] && (

@@ -56,6 +56,7 @@ def _lesson_read(db, lesson, group, user, *, mine=None, submitted=None, students
         starts_at=svc.as_utc(lesson.starts_at),
         room_mode=lesson.room_mode,
         live=lesson.live_since is not None,
+        ended=lesson.live_since is None and lesson.ended_at is not None,
         homework_enabled=lesson.homework_enabled,
         homework_due_at=svc.as_utc(lesson.homework_due_at) if lesson.homework_due_at else None,
         is_teacher=teacher,

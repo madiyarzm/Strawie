@@ -1,17 +1,7 @@
 """Schemas for the public demo endpoints."""
 
 from datetime import datetime
-from typing import List
-
 from pydantic import BaseModel, Field
-
-
-class DemoFileOut(BaseModel):
-    """One pre-seeded editor tab."""
-
-    id: str
-    name: str
-    content: str
 
 
 class DemoRoomCreated(BaseModel):
@@ -28,6 +18,6 @@ class DemoRoomOut(BaseModel):
     expires_at: datetime
     # Yjs room id the client must use; the server owns this format so the
     # client cannot invent a room shape the ACL would have to guess about.
+    # The pages themselves ("<collab_room_id>:page-en", ...) are seeded by
+    # the collaboration server; see app/services/demo_seed.py.
     collab_room_id: str
-    files: List[DemoFileOut]
-    banner_lines: List[str]
