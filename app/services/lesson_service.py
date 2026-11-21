@@ -55,10 +55,11 @@ def schedule_slots(group: Group, start: datetime, end: datetime) -> list[datetim
     """Scheduled class times (UTC) in [start, end), from the group's weekly schedule."""
     sched = group.schedule or {}
     days = sched.get("days") or []
-    time_str = sched.get("time") or ""
-    if not days or len(time_str) != 5:
+    default_time = sched.get("time") or ""
+    # Optional per-day times, {"2": "18:30"}: weekday (as a string, it's JSON) -> HH:MM.
+    per_day = sched.get("times") or {}
+    if not days or len(default_time) != 5:
         return []
-    hour, minute = int(time_str[:2]), int(time_str[3:])
     zone = _zone(sched.get("tz"))
     local_start = as_utc(start).astimezone(zone)
     slots = []
@@ -66,6 +67,10 @@ def schedule_slots(group: Group, start: datetime, end: datetime) -> list[datetim
     last = as_utc(end).astimezone(zone).date()
     while day <= last:
         if day.weekday() in days:
+            time_str = per_day.get(str(day.weekday())) or per_day.get(day.weekday()) or default_time
+            if len(time_str) != 5:
+                time_str = default_time
+            hour, minute = int(time_str[:2]), int(time_str[3:])
             local = datetime(day.year, day.month, day.day, hour, minute, tzinfo=zone)
             moment = local.astimezone(timezone.utc)
             if as_utc(start) <= moment < as_utc(end):
@@ -187,7 +192,10 @@ def update_lesson(db: Session, lesson: Lesson, group: Group, user: User, changes
     if "live" in changes:
         if changes["live"]:
             lesson.live_since = lesson.live_since or utcnow()
+            lesson.ended_at = None
         else:
+            if lesson.live_since is not None:
+                lesson.ended_at = utcnow()
             lesson.live_since = None
             lesson.room_mode = "together"
     if "homework_enabled" in changes:

@@ -8,17 +8,22 @@ from typing import Literal
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 _TIME = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 _BLOCK_ID = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
 
 
 class GroupSchedule(BaseModel):
-    """Weekly class times. days: 0 = Monday ... 6 = Sunday."""
+    """Weekly class times. days: 0 = Monday ... 6 = Sunday.
+
+    `time` is the usual start time; `times` overrides it for particular days
+    ({2: "18:30"} = Wednesdays at 18:30).
+    """
 
     days: list[int] = Field(min_length=1, max_length=7)
     time: str
+    times: dict[int, str] = Field(default_factory=dict, max_length=7)
     tz: str = Field(default="UTC", max_length=64)
 
     @field_validator("days")
@@ -34,6 +39,15 @@ class GroupSchedule(BaseModel):
         if not _TIME.match(v):
             raise ValueError("time must be HH:MM")
         return v
+
+    @model_validator(mode="after")
+    def _times(self) -> "GroupSchedule":
+        for day, value in self.times.items():
+            if not _TIME.match(value):
+                raise ValueError("times must be HH:MM")
+        # Keep only real overrides for days that are in the schedule.
+        self.times = {d: v for d, v in sorted(self.times.items()) if d in self.days and v != self.time}
+        return self
 
     @field_validator("tz")
     @classmethod
@@ -78,6 +92,8 @@ class LessonRead(BaseModel):
     starts_at: datetime
     room_mode: str
     live: bool
+    # The teacher ended the class; it stays open to look back at.
+    ended: bool = False
     homework_enabled: bool
     homework_due_at: datetime | None
     is_teacher: bool

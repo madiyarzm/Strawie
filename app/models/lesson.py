@@ -41,6 +41,9 @@ class Lesson(Base):
     room_mode: Mapped[str] = mapped_column(String(10), nullable=False, default="together")
     # Set while the class is live (teacher pressed Start), cleared on End.
     live_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set when the teacher ends the class (cleared if it's started again). An
+    # ended lesson stays open to everyone in the group, to look back at.
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     homework_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     homework_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

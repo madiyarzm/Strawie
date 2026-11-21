@@ -4,7 +4,8 @@
  * Error carrying the server's message, so screens can show it.
  */
 
-export type Schedule = { days: number[]; time: string; tz: string };
+/** days: 0 = Monday … 6 = Sunday. `times` overrides `time` on some days ({"2": "18:30"}). */
+export type Schedule = { days: number[]; time: string; times?: Record<string, string>; tz: string };
 
 export type Group = {
   id: string;
@@ -26,6 +27,8 @@ export type Lesson = {
   starts_at: string;
   room_mode: "together" | "solo";
   live: boolean;
+  /** The teacher ended the class; it stays open for everyone to look back at. */
+  ended: boolean;
   homework_enabled: boolean;
   homework_due_at: string | null;
   is_teacher: boolean;

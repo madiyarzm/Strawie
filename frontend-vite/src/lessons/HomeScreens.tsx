@@ -4,11 +4,11 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Calendar, Copy, LogIn, Plus, Users } from "lucide-react";
+import { Calendar, Copy, GraduationCap, LogIn, Plus, Users } from "lucide-react";
 import { DAY_KEYS, browserTimeZone, groupsApi, lessonTitle, lessonsApi } from "./api";
 import type { Agenda, Group, Lesson, Slot } from "./api";
 import { dayMonth, dayNumber, isToday, relative, timeOf, weekdayNames, weekdayShort } from "./format";
-import { lessonForSlot, scheduleSummary } from "./schedule";
+import { lessonForSlot, scheduleSummary, timeForDay } from "./schedule";
 
 export type Nav = {
   openLesson: (lessonId: string) => void;
@@ -48,6 +48,7 @@ function upcomingItems(agenda: Agenda, teacherOnly: boolean | null, days = 7): I
   const items: Item[] = [];
   for (const l of agenda.lessons) {
     const t = new Date(l.starts_at).getTime();
+    if (l.ended && !l.live) continue; // finished: listed under recent lessons
     if ((l.live || t > now - 3 * 3_600_000) && t < horizon && (teacherOnly === null || l.is_teacher === teacherOnly)) {
       items.push({ kind: "lesson", lesson: l, at: l.starts_at });
     }
@@ -98,6 +99,10 @@ export const HomeScreen: React.FC<{
   const rest = items.slice(1);
   const homework = (agenda?.lessons ?? []).filter(l => l.homework_enabled && !l.is_teacher)
     .sort((a, b) => new Date(a.homework_due_at ?? a.starts_at).getTime() - new Date(b.homework_due_at ?? b.starts_at).getTime());
+  // Lessons that ended in the last week, newest first, so students can look back at them.
+  const recent = (agenda?.lessons ?? []).filter(l => l.ended && !l.live && l.is_teacher === teacher
+    && new Date(l.starts_at).getTime() > Date.now() - 7 * 86_400_000)
+    .sort((a, b) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime()).slice(0, 5);
   const toReview = (agenda?.lessons ?? []).filter(l => l.is_teacher && l.homework_enabled && (l.submitted_count ?? 0) > 0)
     .sort((a, b) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime()).slice(0, 5);
 
@@ -243,6 +248,15 @@ export const HomeScreen: React.FC<{
         )}
       </div>
 
+      {recent.length > 0 && (
+        <>
+          <h3 className="ls-section">{t("lessons.home.recent", { defaultValue: "Recent lessons" })}</h3>
+          <div className="st-card st-fade-up">
+            {recent.map(l => <PastLessonRow key={l.id} lesson={l} teacher={teacher} nav={nav} />)}
+          </div>
+        </>
+      )}
+
       {rest.length > 0 && (
         <>
           <h3 className="ls-section">{t("lessons.home.thisWeek", { defaultValue: "This week" })}</h3>
@@ -262,6 +276,34 @@ export const HomeScreen: React.FC<{
           </div>
         </>
       )}
+    </div>
+  );
+};
+
+/** A finished lesson: open its class page, or go straight to its homework / review. */
+const PastLessonRow: React.FC<{ lesson: Lesson; teacher: boolean; nav: Nav }> = ({ lesson: l, teacher, nav }) => {
+  const { t } = useTranslation();
+  const hw = l.homework_enabled;
+  const detail = hw
+    ? (teacher
+        ? t("lessons.submittedOf", { defaultValue: "{{n}}/{{total}} submitted", n: l.submitted_count, total: l.student_count })
+        : l.my_homework ? `${t("lessons.homework", { defaultValue: "Homework" })}: ${l.my_homework.score}/${l.my_homework.max_score}` : t("lessons.notStarted", { defaultValue: "Not submitted" }))
+    : `${dayMonth(l.starts_at)} · ${l.group_name}`;
+  return (
+    <div className="ls-row is-static">
+      <DateTile iso={l.starts_at} />
+      <span className="ls-row-main">
+        <b>{lessonTitle(l, t("lessons.untitled", { defaultValue: "Untitled lesson" }))}{l.topic ? <span className="st-chip ls-tag">{l.topic}</span> : null}</b>
+        <span>{detail}</span>
+      </span>
+      {hw && (
+        <button type="button" className="st-btn st-btn-ghost st-btn-sm" onClick={() => teacher ? nav.openReview(l.id) : nav.openHomework(l.id)}>
+          <GraduationCap className="h-3.5 w-3.5" />{teacher ? t("lessons.review.title", { defaultValue: "Review" }) : t("lessons.homework", { defaultValue: "Homework" })}
+        </button>
+      )}
+      <button type="button" className="st-btn st-btn-secondary st-btn-sm" onClick={() => nav.openLesson(l.id)}>
+        {t("lessons.openPage", { defaultValue: "Open lesson" })}
+      </button>
     </div>
   );
 };
@@ -299,10 +341,10 @@ export const GroupScreen: React.FC<{ groupId: string; nav: Nav; onEditSchedule: 
 
   const teacher = group ? isTeacherOf(group) : false;
   const upcoming: Item[] = [
-    ...lessons.filter(l => l.live || new Date(l.starts_at).getTime() > now - 3 * 3_600_000).map(l => ({ kind: "lesson" as const, lesson: l, at: l.starts_at })),
+    ...lessons.filter(l => l.live || (!l.ended && new Date(l.starts_at).getTime() > now - 3 * 3_600_000)).map(l => ({ kind: "lesson" as const, lesson: l, at: l.starts_at })),
     ...slots.map(s => ({ kind: "slot" as const, slot: s, at: s.starts_at })),
   ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime()).slice(0, 6);
-  const earlier = lessons.filter(l => !l.live && new Date(l.starts_at).getTime() <= now - 3 * 3_600_000)
+  const earlier = lessons.filter(l => !l.live && (l.ended || new Date(l.starts_at).getTime() <= now - 3 * 3_600_000))
     .sort((a, b) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime());
   const topics = Object.entries(lessons.reduce<Record<string, number>>((acc, l) => {
     if (l.topic) acc[l.topic] = (acc[l.topic] ?? 0) + 1;
@@ -377,17 +419,7 @@ export const GroupScreen: React.FC<{ groupId: string; nav: Nav; onEditSchedule: 
             );
           })}
           {earlier.length > 0 && <div className="ls-card-sub">{t("lessons.group.earlier", { defaultValue: "Earlier" })}</div>}
-          {earlier.map(l => (
-            <button type="button" key={l.id} className="ls-row" onClick={() => teacher ? (l.homework_enabled ? nav.openReview(l.id) : nav.openLesson(l.id)) : (l.homework_enabled ? nav.openHomework(l.id) : nav.openLesson(l.id))}>
-              <DateTile iso={l.starts_at} />
-              <span className="ls-row-main">
-                <b>{lessonTitle(l, t("lessons.untitled", { defaultValue: "Untitled lesson" }))}</b>
-                <span>{l.homework_enabled
-                  ? (teacher ? t("lessons.submittedOf", { defaultValue: "{{n}}/{{total}} submitted", n: l.submitted_count, total: l.student_count }) : l.my_homework ? `${t("lessons.homework", { defaultValue: "Homework" })}: ${l.my_homework.score}/${l.my_homework.max_score}` : t("lessons.notStarted", { defaultValue: "Not submitted" }))
-                  : dayMonth(l.starts_at)}</span>
-              </span>
-            </button>
-          ))}
+          {earlier.map(l => <PastLessonRow key={l.id} lesson={l} teacher={teacher} nav={nav} />)}
         </div>
 
         <div className="grid gap-4 content-start">
@@ -419,6 +451,13 @@ export const GroupSheet: React.FC<{ group?: Group | null; onClose: () => void; o
   const [name, setName] = useState(group?.name ?? "");
   const [days, setDays] = useState<number[]>(group?.schedule?.days ?? []);
   const [time, setTime] = useState(group?.schedule?.time ?? "17:00");
+  // Per-day start times, used when some days start at a different time.
+  const [perDay, setPerDay] = useState(() => Object.keys(group?.schedule?.times ?? {}).length > 0);
+  const [dayTimes, setDayTimes] = useState<Record<number, string>>(() => {
+    const s = group?.schedule;
+    return s ? Object.fromEntries(s.days.map(d => [d, timeForDay(s, d)])) : {};
+  });
+  const timeOn = (d: number) => dayTimes[d] ?? time;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Group | null>(null);
@@ -435,7 +474,15 @@ export const GroupSheet: React.FC<{ group?: Group | null; onClose: () => void; o
     if (!name.trim()) return;
     setSaving(true);
     setError(null);
-    const schedule = days.length ? { days: [...days].sort(), time, tz: group?.schedule?.tz ?? browserTimeZone() } : null;
+    const sorted = [...days].sort((a, b) => a - b);
+    let schedule = null;
+    if (sorted.length) {
+      // With per-day times, the first class day's time is the usual one and
+      // the others are stored only where they differ.
+      const usual = perDay ? timeOn(sorted[0]) : time;
+      const times = perDay ? Object.fromEntries(sorted.filter(d => timeOn(d) !== usual).map(d => [String(d), timeOn(d)])) : {};
+      schedule = { days: sorted, time: usual, times, tz: group?.schedule?.tz ?? browserTimeZone() };
+    }
     try {
       const saved = editing ? await groupsApi.update(group!.id, { name: name.trim(), schedule }) : await groupsApi.create(name.trim(), schedule);
       if (editing) { onSaved(saved); onClose(); } else { setCreated(saved); onSaved(saved); }
@@ -484,10 +531,34 @@ export const GroupSheet: React.FC<{ group?: Group | null; onClose: () => void; o
                 ))}
               </div>
             </div>
-            <label className="ls-field">
-              <span>{t("lessons.sheet.time", { defaultValue: "Time" })}</span>
-              <input className="st-input" type="time" value={time} onChange={e => setTime(e.target.value)} style={{ maxWidth: 140 }} />
-            </label>
+            {perDay && days.length > 0 ? (
+              <div className="ls-field">
+                <span>{t("lessons.sheet.timesPerDay", { defaultValue: "Time on each day" })}</span>
+                <div className="grid gap-2">
+                  {[...days].sort((a, b) => a - b).map(d => (
+                    <label key={d} className="flex items-center gap-3">
+                      <span style={{ width: 44, fontSize: 13, color: "var(--text-2)" }}>{names[d]}</span>
+                      <input className="st-input" type="time" value={timeOn(d)} required
+                        onChange={e => { const v = e.target.value; if (v) setDayTimes(m => ({ ...m, [d]: v })); }} style={{ maxWidth: 140 }} />
+                    </label>
+                  ))}
+                </div>
+                <button type="button" className="st-btn st-btn-ghost st-btn-sm" style={{ alignSelf: "flex-start", marginLeft: -10 }} onClick={() => { setPerDay(false); setDayTimes({}); }}>
+                  {t("lessons.sheet.sameTime", { defaultValue: "Same time every day" })}
+                </button>
+              </div>
+            ) : (
+              <div className="ls-field">
+                <span id="ls-time-label">{t("lessons.sheet.time", { defaultValue: "Time" })}</span>
+                <input className="st-input" type="time" aria-labelledby="ls-time-label" value={time} onChange={e => { if (e.target.value) setTime(e.target.value); }} style={{ maxWidth: 140 }} />
+                {days.length > 1 && (
+                  <button type="button" className="st-btn st-btn-ghost st-btn-sm" style={{ alignSelf: "flex-start", marginLeft: -10 }}
+                    onClick={() => { setDayTimes(Object.fromEntries(days.map(d => [d, time]))); setPerDay(true); }}>
+                    {t("lessons.sheet.differentTimes", { defaultValue: "Different time on some days?" })}
+                  </button>
+                )}
+              </div>
+            )}
             {error && <p style={{ color: "var(--rose)", fontSize: 13 }}>{error}</p>}
             <div className="flex justify-end gap-2">
               <button type="button" className="st-btn st-btn-ghost" onClick={onClose}>{t("common.cancel")}</button>
